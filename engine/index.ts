@@ -55,6 +55,15 @@ export interface TranscribeSyllableResult {
 }
 
 /**
+ * Hardmap overrides for specific Vietnamese syllables.
+ * Used for exception cases that don't fit standard phoneme rules.
+ */
+const SYLLABLE_OVERRIDES: Record<string, string> = {
+  chiều: "ts,y,u",
+  trìu: "ts,y,u",
+};
+
+/**
  * Transcribe a single Vietnamese syllable to CeVIO phoneme string.
  * Returns comma-separated phoneme symbols + optional error info.
  * Error-tolerant: returns error reason instead of throwing.
@@ -67,6 +76,11 @@ export function transcribeSyllableWithError(
   syl: string,
   mode: "transparent" | "voicevox" = "transparent",
 ): TranscribeSyllableResult {
+  // Check hardmap first (case-sensitive)
+  if (SYLLABLE_OVERRIDES[syl]) {
+    return { phonemes: SYLLABLE_OVERRIDES[syl] };
+  }
+
   try {
     const parsed = segmentSyllable(syl);
     const phonemes = syllableToPhonemes(parsed, mode);

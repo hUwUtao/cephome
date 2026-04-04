@@ -40,8 +40,8 @@ export const CEVIO_PALETTE = new Set([
   "ty",
 
   // Affricates
-  "ch",
   "ts",
+  "ch",
 
   // Special mora
   "N", // moraic nasal
