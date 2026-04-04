@@ -37,14 +37,15 @@ export const CEVIO_PALETTE = new Set([
   "py",
   "by",
   "ry",
+  "ty",
 
   // Affricates
   "ch",
   "ts",
 
   // Special mora
-  "N",   // moraic nasal
-  "cl",  // closure (gemination/glottal stop)
+  "N", // moraic nasal
+  "cl", // closure (gemination/glottal stop)
 
   // Optional (marginal in Japanese)
   "v",

@@ -4,17 +4,17 @@
  */
 
 const ONSET_MAP: Record<string, string[]> = {
-  ngh: ["n", "g", "h"],  // velar nasal + glide before vowel
-  ng: ["n", "g"],        // velar nasal as onset
-  nh: ["n", "h"],
+  ngh: ["n", "g"], // velar nasal onset → n,g
+  ng: ["n", "g"], // velar nasal as onset
+  nh: ["ny"], // /ɲ/ → ny (valid VOICEVOX palatalized)
   ch: ["ch"],
   tr: ["ch"],
-  th: ["t", "h"],
-  ph: ["p", "h"],
-  kh: ["k", "h"],
+  th: ["ty"], // aspirated → palatalized t
+  ph: ["f"], // Vietnamese ph = /f/
+  kh: ["k"], // aspirated → plain
   gi: ["z"],
   gh: ["g"],
-  qu: ["k"],  // medial w is added separately
+  qu: ["k"], // medial w is added separately
   b: ["b"],
   c: ["k"],
   d: ["z"],
@@ -31,7 +31,7 @@ const ONSET_MAP: Record<string, string[]> = {
   t: ["t"],
   v: ["v"],
   x: ["s"],
-  "": [],     // null onset
+  "": [], // null onset
 };
 
 export function onsetToPhonemes(onset: string): string[] {

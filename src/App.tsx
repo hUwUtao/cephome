@@ -59,9 +59,7 @@ export function App() {
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Vietnamese → CeVIO
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Vietnamese → CeVIO</h1>
           <p className="text-lg text-gray-600">Transcribe as you type</p>
         </div>
 
@@ -96,9 +94,7 @@ export function App() {
             </label>
             <pre className="w-full h-96 p-4 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 overflow-auto font-mono text-sm whitespace-pre-wrap break-words">
               {output || (
-                <span className="text-gray-400">
-                  Output will appear here as you type...
-                </span>
+                <span className="text-gray-400">Output will appear here as you type...</span>
               )}
             </pre>
             <button

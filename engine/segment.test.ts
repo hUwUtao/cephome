@@ -105,20 +105,10 @@ test("segment: phước (ph- onset + labialized + stop)", () => {
 
 // Invariant: nucleus is never empty
 test("segment: nucleus never empty invariant", () => {
-  const testCases = [
-    "ba",
-    "ăn",
-    "ơi",
-    "nghe",
-    "kiên",
-    "phương",
-    "dương",
-    "quốc",
-  ];
+  const testCases = ["ba", "ăn", "ơi", "nghe", "kiên", "phương", "dương", "quốc"];
 
   for (const syl of testCases) {
     const parsed = segmentSyllable(syl);
     expect(parsed.nucleus.length).toBeGreaterThan(0);
   }
 });
-

@@ -46,14 +46,16 @@ transcribeText("kiên phương") → "k,i,e,N\nf,w,o,N"
 **POST** `/api/transcribe`
 
 **Request:**
+
 ```json
 {
   "text": "kiên phương",
-  "format": "text"  // or "structured"
+  "format": "text" // or "structured"
 }
 ```
 
 **Response (text format):**
+
 ```json
 {
   "success": true,
@@ -62,6 +64,7 @@ transcribeText("kiên phương") → "k,i,e,N\nf,w,o,N"
 ```
 
 **Response (structured format):**
+
 ```json
 {
   "success": true,
@@ -76,15 +79,15 @@ transcribeText("kiên phương") → "k,i,e,N\nf,w,o,N"
 
 All 7 core examples from `research.md` pass:
 
-| Vietnamese | Output | Status |
-|------------|--------|--------|
-| kiên | k,i,e,N | ✅ |
-| phương | f,w,o,N | ✅ |
-| dương | z,w,o,N | ✅ |
-| vãng | v,a,N | ✅ |
-| dinh | z,i,N | ✅ |
-| tình | t,i,N | ✅ |
-| liên | r,i,e,N | ✅ |
+| Vietnamese | Output  | Status |
+| ---------- | ------- | ------ |
+| kiên       | k,i,e,N | ✅     |
+| phương     | f,w,o,N | ✅     |
+| dương      | z,w,o,N | ✅     |
+| vãng       | v,a,N   | ✅     |
+| dinh       | z,i,N   | ✅     |
+| tình       | t,i,N   | ✅     |
+| liên       | r,i,e,N | ✅     |
 
 ## Implementation Highlights
 

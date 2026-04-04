@@ -57,7 +57,7 @@ export function segmentSyllable(raw: string): ParsedSyllable {
   // qu, h, x, ph can be followed by u/ư/o/ô to form medial w
   let medial = "";
   if (onset === "qu") {
-    medial = "w";  // qu → [k] + medial w
+    medial = "w"; // qu → [k] + medial w
   } else if (["h", "x", "ph", "kh", "th"].includes(onset) && remaining && remaining.length > 1) {
     // Check if next char is u/ư/o/ô (glide-start)
     const firstChar: string = remaining[0] as string;
@@ -84,7 +84,22 @@ export function segmentSyllable(raw: string): ParsedSyllable {
 
         // Don't break up known diphthongs
         // Check if nucleus + candidate would form a recognized diphthong
-        const diphthongs = ["iê", "ia", "uô", "ua", "ươ", "ưa", "oa", "oe", "yê", "ơi", "ui", "ưi", "ei"];
+        const diphthongs = [
+          "iê",
+          "ia",
+          "uô",
+          "ua",
+          "ươ",
+          "ưa",
+          "oa",
+          "oe",
+          "yê",
+          "ơi",
+          "ui",
+          "ưi",
+          "ei",
+          "âu",
+        ];
         const wouldFormDiphthong = diphthongs.includes(potentialNucleus + cand);
         if (wouldFormDiphthong) continue; // Keep as diphthong, don't split off coda
       }
@@ -100,7 +115,7 @@ export function segmentSyllable(raw: string): ParsedSyllable {
 
   if (!nucleus) {
     throw new Error(
-      `Segmentation failed: no vowel in syllable "${raw}". Parsed: onset="${onset}" medial="${medial}" coda="${coda}"`
+      `Segmentation failed: no vowel in syllable "${raw}". Parsed: onset="${onset}" medial="${medial}" coda="${coda}"`,
     );
   }
 

@@ -2,7 +2,7 @@
 
 ## Problem framing and constraints
 
-A “Vietnam → Japanese mora” front-end is essentially a **deterministic transliteration/transcription layer**: it converts Vietnamese syllables into a sequence of Japanese-compatible morae (or mora-sized phoneme chunks) so a Japanese TTS/singing engine can output a *proxy* pronunciation. The core engineering constraint is that the output must obey **Japanese mora/phonotactic limits** (mostly CV timing with a small set of “special” morae), otherwise the target engine will either reject the input or reshape it unpredictably. citeturn6view4turn4search1
+A “Vietnam → Japanese mora” front-end is essentially a **deterministic transliteration/transcription layer**: it converts Vietnamese syllables into a sequence of Japanese-compatible morae (or mora-sized phoneme chunks) so a Japanese TTS/singing engine can output a _proxy_ pronunciation. The core engineering constraint is that the output must obey **Japanese mora/phonotactic limits** (mostly CV timing with a small set of “special” morae), otherwise the target engine will either reject the input or reshape it unpredictably. citeturn6view4turn4search1
 
 In **CeVIO AI**, this kind of mapping is particularly practical on the **Song** side because the editor exposes a phoneme-input mode: you can specify singing directly “in phoneme symbols,” and CeVIO provides a phoneme palette and strict parsing rules (comma/space separates phonemes; `|` can disambiguate syllable boundaries; unknown symbols are treated as errors and the note won’t sound). citeturn17view0turn8view0
 
@@ -11,17 +11,18 @@ If, instead, you require **no neural processing anywhere in the pipeline**, then
 
 ## Vietnamese syllable structure and what “vần” buys you
 
-Vietnamese syllables are well-suited to rule-based conversion because the language is strongly **syllable-centric** and each syllable includes a tone plus a segmental structure. In a phonological framing used in academic work, each syllable consists of one tone (*thanh*) and a segmental syllable made of **onset + rhyme (vần)**, with an optional /w/ adjunct. citeturn14view0turn13view0
+Vietnamese syllables are well-suited to rule-based conversion because the language is strongly **syllable-centric** and each syllable includes a tone plus a segmental structure. In a phonological framing used in academic work, each syllable consists of one tone (_thanh_) and a segmental syllable made of **onset + rhyme (vần)**, with an optional /w/ adjunct. citeturn14view0turn13view0
 
 The “vần” abstraction is attractive because it isolates the part that must be “re-moraified” for Japanese timing: in a common two-tier description used in Vietnamese linguistics/phonetics pedagogy, Vietnamese syllables have:
+
 - Tier 1 (required): **onset (âm đầu), vần, tone (thanh điệu)**
 - Tier 2 (inside vần): **medial/on-glide (âm đệm), nucleus (âm chính), coda (âm cuối)** citeturn11view0
 
 Two practical details from that same tiered description matter directly for your converter design:
 
-1) Vietnamese codas are from a **small, closed class**. The coda can be a semivowel /w/ (spelled o/u) or /j/ (spelled i/y), a nasal (/m n ɲ ŋ/), or an unreleased voiceless stop (/p t k/ with spellings like p, t, c/ch). citeturn11view0turn1search2
+1. Vietnamese codas are from a **small, closed class**. The coda can be a semivowel /w/ (spelled o/u) or /j/ (spelled i/y), a nasal (/m n ɲ ŋ/), or an unreleased voiceless stop (/p t k/ with spellings like p, t, c/ch). citeturn11view0turn1search2
 
-2) Vietnamese also permits a **secondary labial articulation /w/** tied to the onset region (often discussed as a labialized on-glide), e.g., the classic example “hoa” with [hw…]. This corresponds nicely to Japanese `w`-type morae (wa/wi/we/wo) and is one reason a “vần-first” mapping tends to be stable. citeturn13view0turn1search2
+2. Vietnamese also permits a **secondary labial articulation /w/** tied to the onset region (often discussed as a labialized on-glide), e.g., the classic example “hoa” with [hw…]. This corresponds nicely to Japanese `w`-type morae (wa/wi/we/wo) and is one reason a “vần-first” mapping tends to be stable. citeturn13view0turn1search2
 
 The main thing “vần mapping + stitching” gives you is the ability to create a reusable mapping for rimes such as **iên, ương, inh/ình, ang/ãng**, etc., while letting a separate onset map handle consonant inventory mismatch.
 
@@ -34,7 +35,7 @@ Loanword phonology literature further supports the typical Japanese repair strat
 
 On the CeVIO side, there are two relevant “interfaces”:
 
-- **Song Track phoneme input**: CeVIO AI allows direct phoneme-symbol specification for Japanese Song Voices; the editor provides a palette and defines parsing rules (comma/space separators; `|` to separate syllables if ambiguous). citeturn17view0turn8view0  
+- **Song Track phoneme input**: CeVIO AI allows direct phoneme-symbol specification for Japanese Song Voices; the editor provides a palette and defines parsing rules (comma/space separators; `|` to separate syllables if ambiguous). citeturn17view0turn8view0
 - **Talk Track mora-centric editing**: the Talk phoneme graph UI is explicitly mora-aware—accent can be placed by clicking a mora, accent phrases can be split/merged “between mora and mora,” and pitch/length/volume can be adjusted at phoneme granularity. citeturn19view0
 
 image_group{"layout":"carousel","aspect_ratio":"16:9","query":["CeVIO AI 日本語 音素パレット","CeVIO Japanese phoneme palette image","CeVIO 音素入力モード 音素パレット"] ,"num_per_query":1}
@@ -45,23 +46,24 @@ A particularly important operational constraint for your pipeline is that the Ja
 
 Your proposed pipeline aligns well with how both Vietnamese phonology and CeVIO Song phoneme entry behave:
 
-1) **Normalize and canonicalize the Vietnamese input**  
-Vietnamese orthography places tone marks on vowel letters following defined rules, and the same logical letter may appear as different composed glyphs (e.g., vowel quality marks + tone marks). In practice, you want a normalization step that makes segmentation deterministic—typically: lowercase, Unicode-normalize (NFD), strip tone marks while optionally retaining vowel-quality diacritics (ă â ê ô ơ ư, and đ), then recompose (NFC) for stable string keys. The motivation is that Vietnamese writing is diacritics-dense and can be represented in multiple equivalent encodings. citeturn1search7
+1. **Normalize and canonicalize the Vietnamese input**  
+   Vietnamese orthography places tone marks on vowel letters following defined rules, and the same logical letter may appear as different composed glyphs (e.g., vowel quality marks + tone marks). In practice, you want a normalization step that makes segmentation deterministic—typically: lowercase, Unicode-normalize (NFD), strip tone marks while optionally retaining vowel-quality diacritics (ă â ê ô ơ ư, and đ), then recompose (NFC) for stable string keys. The motivation is that Vietnamese writing is diacritics-dense and can be represented in multiple equivalent encodings. citeturn1search7
 
-2) **Segment each syllable into onset and vần components**  
-A reliable rule-based segmentor for Quốc Ngữ can be built by:
+2. **Segment each syllable into onset and vần components**  
+   A reliable rule-based segmentor for Quốc Ngữ can be built by:
+
 - matching the **longest onset grapheme** from a fixed list (e.g., ngh, ng, nh, ch, tr, th, ph, kh, gi, gh, qu, … plus single letters),
 - then matching the **longest coda** from a fixed list (p, t, c/ch, m, n, ng, nh, and possibly semivowel codas),
 - whatever remains is the vowel complex (with potential medial/on-glide). This approach is well-supported by the constrained syllable template descriptions used for Vietnamese. citeturn11view0turn13view0turn1search2
 
-3) **Map onset graphemes to CeVIO Japanese phoneme symbols**  
-This mapping is inherently lossy because the CeVIO Japanese inventory is smaller than Vietnamese’s, but the objective is intelligible approximation. The HMU phonetics-oriented description (Northern Vietnamese as reference) provides a handy correspondence list between Vietnamese orthography and IPA-like categories for many onsets, and it explicitly notes /v/, /z/ (for d/r), /f/ (ph), etc., enabling a consistent rule-based onset map. citeturn11view0
+3. **Map onset graphemes to CeVIO Japanese phoneme symbols**  
+   This mapping is inherently lossy because the CeVIO Japanese inventory is smaller than Vietnamese’s, but the objective is intelligible approximation. The HMU phonetics-oriented description (Northern Vietnamese as reference) provides a handy correspondence list between Vietnamese orthography and IPA-like categories for many onsets, and it explicitly notes /v/, /z/ (for d/r), /f/ (ph), etc., enabling a consistent rule-based onset map. citeturn11view0
 
-4) **Map vần to Japanese mora sequences**  
-Instead of enumerating every vần as an atomic unit, you can decompose vần into (medial /w/?) + nucleus (1–2 vowel targets) + coda target (N/cl or vowel-final). This is consistent with the two-tier Vietnamese model and fits Japanese mora building blocks. citeturn11view0turn6view4
+4. **Map vần to Japanese mora sequences**  
+   Instead of enumerating every vần as an atomic unit, you can decompose vần into (medial /w/?) + nucleus (1–2 vowel targets) + coda target (N/cl or vowel-final). This is consistent with the two-tier Vietnamese model and fits Japanese mora building blocks. citeturn11view0turn6view4
 
-5) **Stitch mora sequences and validate against CeVIO’s parser**  
-Finally, emit phoneme sequences separated by commas, using `|` when you must force a syllable break. CeVIO explicitly recognizes comma/space as phoneme separators and supports `|` for syllable disambiguation; invalid symbols produce an error and silence the note, which is a convenient “hard fail” signal for automated QA. citeturn17view0
+5. **Stitch mora sequences and validate against CeVIO’s parser**  
+   Finally, emit phoneme sequences separated by commas, using `|` when you must force a syllable break. CeVIO explicitly recognizes comma/space as phoneme separators and supports `|` for syllable disambiguation; invalid symbols produce an error and silence the note, which is a convenient “hard fail” signal for automated QA. citeturn17view0
 
 A cache layer fits naturally: cache at three levels (normalized syllable → phoneme string; vần → nucleus/coda expansion; and optional exception dictionary). Your “group by word batch” idea is equivalent to: compute unique normalized keys first, map once, then re-expand to the full list—useful if you are generating large lyric corpora.
 
@@ -82,21 +84,23 @@ The examples you gave (e.g., `dinh → z,...`, `dương → z,...`) implicitly a
 
 A practical mapping spec (orthography-driven) that stays within the palette is:
 
-**Onset (âm đầu) → CeVIO consonant(s)**  
-- `b` → `b`; `p` → `p`; `m` → `m` citeturn11view0turn8view0  
-- `ph` → `f` (preferred, since `f` exists in the palette) citeturn11view0turn8view0  
-- `v` → `v` (CeVIO palette includes `v`, though Japanese /v/ is marginal; you may optionally back off to `b` if it sounds more stable in a given voice) citeturn8view0turn4search1  
-- `t`/`th` → `t`; `đ` → `d` citeturn11view0turn8view0  
-- `d`/`gi`/`r` (Northern-style) → `z` citeturn11view0turn1search2turn8view0  
-- `n` → `n`; `nh` (onset) → `ny` citeturn11view0turn8view0  
-- `c/k/q` → `k`; `g/gh` → `g` citeturn11view0turn8view0  
-- `ch` (and often `tr` in merger-prone systems) → `ch` (or sometimes `ty` depending on style goals) citeturn1search2turn8view0  
-- `s/x` → `s` (optionally `sh` if you want a “more palatal” flavor in approximation) citeturn1search2turn8view0  
-- `h` → `h`; `kh` → `h` (lossy: Japanese lacks /x/) citeturn11view0turn8view0  
+**Onset (âm đầu) → CeVIO consonant(s)**
+
+- `b` → `b`; `p` → `p`; `m` → `m` citeturn11view0turn8view0
+- `ph` → `f` (preferred, since `f` exists in the palette) citeturn11view0turn8view0
+- `v` → `v` (CeVIO palette includes `v`, though Japanese /v/ is marginal; you may optionally back off to `b` if it sounds more stable in a given voice) citeturn8view0turn4search1
+- `t`/`th` → `t`; `đ` → `d` citeturn11view0turn8view0
+- `d`/`gi`/`r` (Northern-style) → `z` citeturn11view0turn1search2turn8view0
+- `n` → `n`; `nh` (onset) → `ny` citeturn11view0turn8view0
+- `c/k/q` → `k`; `g/gh` → `g` citeturn11view0turn8view0
+- `ch` (and often `tr` in merger-prone systems) → `ch` (or sometimes `ty` depending on style goals) citeturn1search2turn8view0
+- `s/x` → `s` (optionally `sh` if you want a “more palatal” flavor in approximation) citeturn1search2turn8view0
+- `h` → `h`; `kh` → `h` (lossy: Japanese lacks /x/) citeturn11view0turn8view0
 - `qu` → commonly `k,w` (because Vietnamese `qu-` patterns as /kw/ in many analyses; your segmentor should treat the `u` as part of onset, not the nucleus) citeturn11view0turn13view0
 
 **Vần nucleus (âm chính) → vowel sequence**
 Using the vowel inventory described in the Vietnamese phonetics source, a robust approximation table is:
+
 - i/y → `i`
 - ê/e → `e` (both collapse to `e` as Japanese has only one mid front vowel)
 - a/ă/â → `a`
@@ -104,6 +108,7 @@ Using the vowel inventory described in the Vietnamese phonetics source, a robust
 - u/ư → `u` citeturn11view0turn8view0
 
 For the common diphthong nuclei listed (ia/iê, ưa/ươ, uô/ua), a reasonable Japanese mora expansion is:
+
 - `iê/ia` → `i,e` (matches your `kiên → k,i,e,...` intuition)
 - `uô/ua` → `u,o` or `w,a` depending on the orthographic environment
 - `ươ/ưa` → often `w,o` (treating the medial /w/ + `o` as a proxy; this aligns with the idea that Vietnamese allows a labial on-glide and Japanese explicitly has `w` morae) citeturn11view0turn13view0turn6view4
@@ -111,6 +116,7 @@ For the common diphthong nuclei listed (ia/iê, ưa/ươ, uô/ua), a reasonable 
 **Coda (âm cuối) → special mora strategy**
 Vietnamese coda inventory is explicitly constrained (semivowels, nasals, unreleased stops). citeturn11view0turn1search2  
 A conservative, “always-valid” CeVIO/Japanese strategy is:
+
 - any nasal coda (`m n ng nh`) → `N`
 - any stop coda (`p t c/ch`) → `cl` (often paired with a following consonant if you are encoding a geminate-like effect across a boundary; if the syllable ends the line, `cl` behaves as a “hard stop” marker in many singing-synth workflows) citeturn8view0turn9search1
 
@@ -146,17 +152,17 @@ The most effective readiness checks are mechanical:
 - **CeVIO parser conformity**: ensure phoneme separators are half-width comma or space, and use `|` when syllable boundaries could be ambiguous. CeVIO’s official guide states this explicitly, and also tells you how failures present (red error, no vocalization). citeturn17view0
 - **Unit tests for segmentor invariants**: verify that every input syllable is segmented into exactly one onset + one vần + one tone category (tone often ignored in output, but you should still detect/strip it deterministically). This matches the structural descriptions used in Vietnamese phonetic references. citeturn11view0turn14view0turn13view0
 
-For *auditory* validation, the most efficient approach is staged listening:
+For _auditory_ validation, the most efficient approach is staged listening:
 
-1) Start with a small syllable set covering vowel nuclei and codas (especially the full set of nasal codas and stop codas). The Vietnamese description lists exactly which codas exist, which makes coverage-based selection straightforward. citeturn11view0  
-2) Iterate on “high-impact patches” first: `ươ/ưa`, `iê/ia`, `qu-`, `gi-`, and final `nh/ch` rimes (because of their analysis variation). citeturn11view0turn1search2  
-3) If you target Talk rather than Song, plan for prosody work: CeVIO’s Talk phoneme graph lets you adjust pitch/length/volume by phoneme and explicitly manipulates accent at the mora level, but Japanese pitch accent is not a Vietnamese tone system. Expect a lot of manual or heuristic pitch shaping if tone is a must-have. citeturn19view0turn13view0
+1. Start with a small syllable set covering vowel nuclei and codas (especially the full set of nasal codas and stop codas). The Vietnamese description lists exactly which codas exist, which makes coverage-based selection straightforward. citeturn11view0
+2. Iterate on “high-impact patches” first: `ươ/ưa`, `iê/ia`, `qu-`, `gi-`, and final `nh/ch` rimes (because of their analysis variation). citeturn11view0turn1search2
+3. If you target Talk rather than Song, plan for prosody work: CeVIO’s Talk phoneme graph lets you adjust pitch/length/volume by phoneme and explicitly manipulates accent at the mora level, but Japanese pitch accent is not a Vietnamese tone system. Expect a lot of manual or heuristic pitch shaping if tone is a must-have. citeturn19view0turn13view0
 
 Finally, if your “userland” goal includes automation around CeVIO (e.g., regenerate audio after updating the cache), CeVIO’s official documentation describes external integration paths: SAPI5 linkage for compatible 64-bit tools and programmatic interfaces via COM and .NET for more detailed control. citeturn12view0turn6view2
 
 A concise readiness checklist for your specific format (“1 word per line → 1 mora group per line”) is:
 
-- Every output line is a comma-separated sequence that uses only Japanese Song phoneme symbols from the CeVIO palette; any intentional out-of-palette symbol is version-gated and tested. citeturn17view0turn8view0  
-- The segmentor deterministically isolates onset vs vần and decomposes vần into medial/nucleus/coda consistent with Vietnamese structural descriptions. citeturn11view0turn14view0turn13view0  
-- The mapper has a “conservative mode” that guarantees mora legality (favor `N` and `cl` for codas), plus an override layer for patch-prone rimes (especially those involving final `nh/ch`, and complex nuclei like `ươ`). citeturn1search2turn6view4turn8view0  
+- Every output line is a comma-separated sequence that uses only Japanese Song phoneme symbols from the CeVIO palette; any intentional out-of-palette symbol is version-gated and tested. citeturn17view0turn8view0
+- The segmentor deterministically isolates onset vs vần and decomposes vần into medial/nucleus/coda consistent with Vietnamese structural descriptions. citeturn11view0turn14view0turn13view0
+- The mapper has a “conservative mode” that guarantees mora legality (favor `N` and `cl` for codas), plus an override layer for patch-prone rimes (especially those involving final `nh/ch`, and complex nuclei like `ươ`). citeturn1search2turn6view4turn8view0
 - Regression tests include CeVIO-side acceptance: no red lyric errors (invalid phonemes) and stable syllable parsing (add `|` only where required). citeturn17view0

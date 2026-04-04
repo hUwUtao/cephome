@@ -1,10 +1,5 @@
 import { test, expect } from "bun:test";
-import {
-  transcribeSyllable,
-  transcribeWord,
-  transcribe,
-  transcribeText,
-} from "./index.ts";
+import { transcribeSyllable, transcribeWord, transcribe, transcribeText } from "./index.ts";
 
 // Research.md core examples - MUST PASS
 test("research: kiên", () => {
@@ -12,11 +7,11 @@ test("research: kiên", () => {
 });
 
 test("research: phương", () => {
-  expect(transcribeSyllable("phương")).toBe("p,h,w,o,n,g");
+  expect(transcribeSyllable("phương")).toBe("f,u,o,n,g");
 });
 
 test("research: dương", () => {
-  expect(transcribeSyllable("dương")).toBe("z,w,o,n,g");
+  expect(transcribeSyllable("dương")).toBe("z,u,o,n,g");
 });
 
 test("research: vãng", () => {
@@ -41,27 +36,27 @@ test("transcribe: null onset vowel", () => {
 });
 
 test("transcribe: stop coda", () => {
-  expect(transcribeSyllable("thác")).toBe("t,h,a,k");
+  expect(transcribeSyllable("thác")).toBe("ty,a,k");
 });
 
 test("transcribe: qu- medial w", () => {
-  expect(transcribeSyllable("quốc")).toBe("k,w,o,k");
+  expect(transcribeSyllable("quốc")).toBe("k,u,o,k");
 });
 
 test("transcribe: quân with medial w", () => {
-  expect(transcribeSyllable("quân")).toBe("k,w,a,n");
+  expect(transcribeSyllable("quân")).toBe("k,u,a,n");
 });
 
 test("transcribe: hoa labialized", () => {
-  expect(transcribeSyllable("hoa")).toBe("h,w,a");
+  expect(transcribeSyllable("hoa")).toBe("h,u,a");
 });
 
 test("transcribe: hoàng labialized + nasal", () => {
-  expect(transcribeSyllable("hoàng")).toBe("h,w,a,n,g");
+  expect(transcribeSyllable("hoàng")).toBe("h,u,a,n,g");
 });
 
 test("transcribe: xuân", () => {
-  expect(transcribeSyllable("xuân")).toBe("s,w,a,n");
+  expect(transcribeSyllable("xuân")).toBe("s,u,a,n");
 });
 
 test("transcribe: chiêng", () => {
@@ -73,11 +68,11 @@ test("transcribe: tiết", () => {
 });
 
 test("transcribe: mướp", () => {
-  expect(transcribeSyllable("mướp")).toBe("m,w,o,p");
+  expect(transcribeSyllable("mướp")).toBe("m,u,o,p");
 });
 
 test("transcribe: phước", () => {
-  expect(transcribeSyllable("phước")).toBe("p,h,w,o,k");
+  expect(transcribeSyllable("phước")).toBe("f,u,o,k");
 });
 
 // Coda variations
@@ -101,9 +96,9 @@ test("transcribe: tay (y coda)", () => {
   expect(transcribeSyllable("tay")).toBe("t,a,i");
 });
 
-// Multi-character onset (ngh, ng output empty consonant)
+// Multi-character onset (ngh → n,g, ng → n,g per new mapping)
 test("transcribe: ngh onset", () => {
-  expect(transcribeSyllable("nghèo")).toBe("n,g,h,e,u");
+  expect(transcribeSyllable("nghèo")).toBe("n,g,e,o");
 });
 
 test("transcribe: ng onset", () => {
@@ -111,7 +106,7 @@ test("transcribe: ng onset", () => {
 });
 
 test("transcribe: nh onset", () => {
-  expect(transcribeSyllable("nhà")).toBe("n,h,a");
+  expect(transcribeSyllable("nhà")).toBe("ny,a");
 });
 
 // Word transcription
@@ -138,4 +133,54 @@ test("transcribe: structured result", () => {
 test("transcribeSyllable: error-tolerant (invalid input returns empty)", () => {
   const result = transcribeSyllable("xyz");
   expect(result).toBe("");
+});
+
+// VOICEVOX mode tests — nasal/stop codas converted to N/cl, digraph onsets simplified
+test("voicevox: vãng (nasal ng → N)", () => {
+  expect(transcribeSyllable("vãng", "voicevox")).toBe("v,a,N");
+});
+
+test("voicevox: kiên (nasal n → N)", () => {
+  expect(transcribeSyllable("kiên", "voicevox")).toBe("k,i,e,N");
+});
+
+test("voicevox: phương (ph → f onset, nasal ng → N)", () => {
+  expect(transcribeSyllable("phương", "voicevox")).toBe("f,u,o,N");
+});
+
+test("voicevox: thác (th → ty onset, stop t → cl)", () => {
+  expect(transcribeSyllable("thác", "voicevox")).toBe("ty,a,cl");
+});
+
+test("voicevox: nhà (nh → ny onset)", () => {
+  expect(transcribeSyllable("nhà", "voicevox")).toBe("ny,a");
+});
+
+test("voicevox: ngã (ng → n,g onset)", () => {
+  expect(transcribeSyllable("ngã", "voicevox")).toBe("n,g,a");
+});
+
+// New tests for derived rules
+test("transcribe: thu (th→ty)", () => {
+  expect(transcribeSyllable("thu")).toBe("ty,u");
+});
+
+test("transcribe: như (nh→ny)", () => {
+  expect(transcribeSyllable("như")).toBe("ny,u");
+});
+
+test("transcribe: thuyền (triphthong uyê)", () => {
+  expect(transcribeSyllable("thuyền")).toBe("ty,u,y,e,n");
+});
+
+test("transcribe: theo (th→ty, coda o)", () => {
+  expect(transcribeSyllable("theo")).toBe("ty,e,o");
+});
+
+test("transcribe: đâu (âu diphthong)", () => {
+  expect(transcribeSyllable("đâu")).toBe("d,o,u");
+});
+
+test("transcribe: xuôi (medial u)", () => {
+  expect(transcribeSyllable("xuôi")).toBe("s,u,o,i");
 });

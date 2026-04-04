@@ -22,7 +22,7 @@ const server = serve({
       },
     },
 
-    "/api/hello/:name": async req => {
+    "/api/hello/:name": async (req) => {
       const name = req.params.name;
       return Response.json({
         message: `Hello, ${name}!`,
@@ -32,17 +32,16 @@ const server = serve({
     "/api/transcribe": {
       async POST(req) {
         try {
-          const { text, format } = await req.json() as { text?: string; format?: "text" | "structured" };
+          const { text, format } = (await req.json()) as {
+            text?: string;
+            format?: "text" | "structured";
+          };
 
           if (!text) {
-            return Response.json(
-              { error: "Missing 'text' in request body" },
-              { status: 400 }
-            );
+            return Response.json({ error: "Missing 'text' in request body" }, { status: 400 });
           }
 
-          const result =
-            format === "text" ? transcribeText(text) : transcribe(text);
+          const result = format === "text" ? transcribeText(text) : transcribe(text);
 
           return Response.json({ success: true, result });
         } catch (error) {
@@ -50,7 +49,7 @@ const server = serve({
             {
               error: error instanceof Error ? error.message : String(error),
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       },

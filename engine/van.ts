@@ -12,15 +12,17 @@ export function nucleusToPhonemes(nucleus: string): string[] {
     ia: ["i", "e"],
     uô: ["u", "o"],
     ua: ["u", "o"],
-    ươ: ["w", "o"],
-    ưa: ["w", "o"],
-    oa: ["w", "a"],
-    oe: ["w", "e"],
+    ươ: ["u", "o"],
+    ưa: ["u", "o"],
+    oa: ["u", "a"],
+    oe: ["u", "e"],
     yê: ["i", "e"],
     ơi: ["o", "i"],
     ui: ["u", "i"],
-    ưi: ["w", "i"],
+    ưi: ["u", "i"],
     ei: ["e", "i"],
+    âu: ["o", "u"],
+    uyê: ["u", "y", "e"],
     // Double vowels (for transliterations/loanwords)
     aa: ["a"],
     ee: ["e"],
@@ -61,24 +63,40 @@ export function nucleusToPhonemes(nucleus: string): string[] {
  * Map coda to phonemes, with tone-aware variations.
  * Tones 0-5 get different coda representations to encode prosody.
  * This allows CeVIO to differentiate tonal information via phoneme choice.
+ *
+ * Mode 'voicevox': nasal codas → N, stop codas → cl (VOICEVOX mora-legal)
+ * Mode 'transparent': individual phonemes (CeVIO-style, default)
  */
-export function codaToPhonemes(coda: string, tone: number = 0): string[] {
+export function codaToPhonemes(
+  coda: string,
+  tone: number = 0,
+  mode: "transparent" | "voicevox" = "transparent",
+): string[] {
   if (!coda) return [];
 
+  if (mode === "voicevox") {
+    // Nasal codas → N (moraic nasal)
+    if (["m", "n", "ng", "nh"].includes(coda)) return ["N"];
+    // Stop codas → cl (closure/gemination)
+    if (["p", "t", "c", "ch"].includes(coda)) return ["cl"];
+    // Semivowel codas — unchanged (fall through)
+  }
+
+  // Transparent mode (or voicevox semivowel fallthrough)
   // Nasal codas → individual phonemes (more transparent for loan words)
   if (coda === "m") return ["m"];
   if (coda === "n") return ["n"];
   if (coda === "ng") {
-    return ["n", "g"];  // velar nasal as coda
+    return ["n", "g"]; // velar nasal as coda
   }
   if (coda === "nh") {
-    return ["n", "h"];  // palatal nasal as coda
+    return ["n", "h"]; // palatal nasal as coda
   }
 
   // Stop codas → individual phonemes (more transparent for loan words)
   if (coda === "p") return ["p"];
   if (coda === "t") return ["t"];
-  if (coda === "c") return ["k"];  // Vietnamese "c" = /k/
+  if (coda === "c") return ["k"]; // Vietnamese "c" = /k/
   if (coda === "ch") return ["ch"];
 
   // Semivowel codas (tone-independent)
@@ -86,8 +104,12 @@ export function codaToPhonemes(coda: string, tone: number = 0): string[] {
     return ["i"];
   }
 
-  if (["o", "u"].includes(coda)) {
+  if (coda === "u") {
     return ["u"];
+  }
+
+  if (coda === "o") {
+    return ["o"];
   }
 
   throw new Error(`Unknown coda: "${coda}"`);

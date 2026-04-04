@@ -5,21 +5,16 @@ A deterministic, rule-based engine for converting Vietnamese Quốc Ngữ to CeV
 ## Usage
 
 ```typescript
-import {
-  transcribeSyllable,
-  transcribeWord,
-  transcribe,
-  transcribeText,
-} from "./engine/index.ts";
+import { transcribeSyllable, transcribeWord, transcribe, transcribeText } from "./engine/index.ts";
 
 // Single syllable
-transcribeSyllable("kiên") // → "k,i,e,N"
+transcribeSyllable("kiên"); // → "k,i,e,N"
 
 // Text with multiple words
-transcribeText("kiên phương") // → "k,i,e,N\nf,w,o,N"
+transcribeText("kiên phương"); // → "k,i,e,N\nf,w,o,N"
 
 // Structured result
-transcribe("kiên phương")
+transcribe("kiên phương");
 // → {
 //   input: "kiên phương",
 //   lines: [
@@ -32,26 +27,32 @@ transcribe("kiên phương")
 ## API
 
 ### `transcribeSyllable(syl: string): string`
+
 Converts a single Vietnamese syllable to comma-separated CeVIO phoneme symbols.
 
 **Example:**
+
 ```typescript
-transcribeSyllable("kiên") // "k,i,e,N"
-transcribeSyllable("phương") // "f,w,o,N"
+transcribeSyllable("kiên"); // "k,i,e,N"
+transcribeSyllable("phương"); // "f,w,o,N"
 ```
 
 ### `transcribeWord(word: string): string[]`
+
 Transcribes a word (assumed single syllable or pre-segmented). Returns array of phoneme strings.
 
 ### `transcribe(text: string): TranscribeResult`
+
 Transcribes arbitrary Vietnamese text (word-separated by spaces). Returns structured result.
 
 ### `transcribeText(text: string): string`
+
 Transcribes text and returns newline-separated lines (one per word) with syllables separated by `|`.
 
 **Example:**
+
 ```typescript
-transcribeText("kiên phương dương")
+transcribeText("kiên phương dương");
 // "k,i,e,N"
 // "f,w,o,N"
 // "z,w,o,N"
@@ -80,6 +81,7 @@ Output is constrained to the CeVIO Japanese Song Voice palette:
 ### Coverage
 
 **Core research.md examples (100% pass):**
+
 - kiên → k,i,e,N
 - phương → f,w,o,N
 - dương → z,w,o,N

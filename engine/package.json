@@ -1,7 +1,11 @@
 {
   "name": "@cephome/engine",
-  "module": "index.ts",
   "type": "module",
+  "module": "index.ts",
+  "scripts": {
+    "cli": "bun run cli.ts",
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
