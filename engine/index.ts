@@ -204,3 +204,4 @@ function syllableToPhonemes(
 
 // Export types for downstream use
 export type { ParsedSyllable, TranscribeResult };
+export * as sinsy from "./sinsy/index.ts";

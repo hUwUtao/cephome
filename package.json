@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
+    "build:musicXMLtoLabel": "bun build --compile ./engine/sinsy/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel",
+    "build:musicXMLtoLabel:win": "bun build --compile --target=bun-windows-x64 ./engine/sinsy/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel.exe",
     "build": "bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
     "start": "NODE_ENV=production bun src/index.ts",
     "fmt": "oxfmt"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.9.10",
     "react": "^19",
     "react-dom": "^19"
   },
