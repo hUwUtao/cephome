@@ -1,6 +1,7 @@
 import type {
   LyricTranspiler,
   PhoneEvent,
+  PhoneRole,
   RoleAwareLyricTranspiler,
   ScoreDocument,
   ScoreNote,
@@ -35,6 +36,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
           end,
           phoneme,
           cls: classifyPhone(phoneme),
+          role: "anchor",
           note,
           phoneIndexInNote: index,
           phoneCountInNote: phones.length,
@@ -52,6 +54,10 @@ export interface VowelAnchoredTimingOptions {
   tailRatio: number;
   maxTailSeconds: number;
   maxNonAnchorRatio: number;
+  prefireStrength: number;
+  lingerRatio: number;
+  maxLingerSeconds: number;
+  tailSteal: number;
 }
 
 export class VowelAnchoredTimingStrategy implements TimingStrategy {
@@ -64,6 +70,10 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       tailRatio: options.tailRatio ?? 0.25,
       maxTailSeconds: options.maxTailSeconds ?? 0.12,
       maxNonAnchorRatio: options.maxNonAnchorRatio ?? 0.6,
+      prefireStrength: options.prefireStrength ?? 0.45,
+      lingerRatio: options.lingerRatio ?? 0.18,
+      maxLingerSeconds: options.maxLingerSeconds ?? 0.08,
+      tailSteal: options.tailSteal ?? 0.6,
     };
   }
 
@@ -93,6 +103,7 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
           end: window.end,
           phoneme: window.phone,
           cls: classifyPhone(window.phone),
+          role: window.role,
           note,
           phoneIndexInNote: index,
           phoneCountInNote: windows.length,
@@ -100,7 +111,7 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       });
     }
 
-    return events;
+    return applyBoundaryPrefire(events, this.options);
   }
 }
 
@@ -113,8 +124,7 @@ function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): strin
   if (note.carriedPhones)
     return note.hasBreath ? [...note.carriedPhones, "br"] : note.carriedPhones;
   const phones = note.lyric ? lyricTranspiler.transpile(note.lyric).phones : [];
-  const base = phones.length > 0 ? phones : ["pau"];
-  return note.hasBreath ? [...base, "br"] : base;
+  return note.hasBreath ? [...phones, "br"] : phones;
 }
 
 function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPhonePlan[] {
@@ -135,7 +145,6 @@ function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPh
     plan = phonesToPlan(note.lyric ? lyricTranspiler.transpile(note.lyric).phones : []);
   }
 
-  if (plan.length === 0) plan = [{ phone: "pau", role: "breath", weight: 1 }];
   if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
   return plan;
 }
@@ -191,6 +200,62 @@ function assignPhoneWindows(
     ...splitWindow(anchor, preEnd, tailStart),
     ...splitWindow(tail, tailStart, end),
   ];
+}
+
+function applyBoundaryPrefire(
+  events: PhoneEvent[],
+  options: VowelAnchoredTimingOptions,
+): PhoneEvent[] {
+  const groups = groupByNote(events);
+  for (let index = 1; index < groups.length; index++) {
+    const previous = groups[index - 1]!;
+    const current = groups[index]!;
+    const previousNote = previous[0]!.note;
+    const currentNote = current[0]!.note;
+
+    if (previousNote.isRest || currentNote.isRest || currentNote.hasBreath) continue;
+
+    const preEvents = current.filter((event) => event.role === "pre");
+    if (preEvents.length === 0) continue;
+
+    const boundary = current[0]!.start;
+    const preDuration = sumDurations(preEvents);
+    const previousDuration = previous[previous.length - 1]!.end - previous[0]!.start;
+    const lingerReserve = Math.min(
+      previousDuration * options.lingerRatio,
+      options.maxLingerSeconds * 10_000_000,
+    );
+    const prefire = Math.floor(
+      Math.min(preDuration * options.prefireStrength, lingerReserve * options.tailSteal),
+    );
+
+    if (prefire <= 0) continue;
+
+    const previousLast = previous[previous.length - 1]!;
+    const newPreviousEnd = Math.max(previousLast.start + 1, boundary - prefire);
+    previousLast.end = Math.min(previousLast.end, newPreviousEnd);
+
+    for (const event of current) {
+      event.start = Math.max(previousLast.end, event.start - prefire);
+      event.end = Math.max(event.start + 1, event.end - prefire);
+    }
+  }
+
+  return events;
+}
+
+function groupByNote(events: PhoneEvent[]): PhoneEvent[][] {
+  const groups: PhoneEvent[][] = [];
+  for (const event of events) {
+    const current = groups[groups.length - 1];
+    if (!current || current[0]!.note.id !== event.note.id) groups.push([event]);
+    else current.push(event);
+  }
+  return groups;
+}
+
+function sumDurations(events: Array<{ start: number; end: number; role: PhoneRole }>): number {
+  return events.reduce((sum, event) => sum + Math.max(0, event.end - event.start), 0);
 }
 
 function splitWindow(

@@ -9,6 +9,7 @@ import {
   VietnameseMoraPlanTranspiler,
   VietnameseSinsyLyricTranspiler,
   VocalLineNormalizer,
+  expressionForNote,
 } from "./index.ts";
 import { parseMusicXmlToLabelArgs, runMusicXmlToLabel } from "./musicXMLtoLabel.ts";
 import { CumulativeFloatTimingStrategy, VowelAnchoredTimingStrategy } from "./timing.ts";
@@ -109,6 +110,57 @@ const COMPLEX_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </part>
 </score-partwise>`;
 
+const ADJACENT_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <time><beats>2</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <direction>
+        <direction-type><dynamics><f/></dynamics></direction-type>
+        <sound tempo="100"/>
+      </direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <notations><articulations><accent/></articulations></notations>
+        <lyric><syllabic>single</syllabic><text>kiên</text></lyric>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <lyric><syllabic>single</syllabic><text>dạ</text></lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+const NO_LYRIC_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <direction><sound tempo="100"/></direction>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <rest/>
+        <duration>2</duration>
+        <voice>1</voice>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
 test("MusicXML parser builds note data structure", () => {
   const score = new DomMusicXmlParser().parse(SIMPLE_XML, "simple.musicxml");
   expect(score.divisions).toBe(2);
@@ -174,11 +226,45 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   );
 });
 
+test("vowel-anchored timing prefires leading van against previous lingering tail", () => {
+  const score = new DomMusicXmlParser().parse(ADJACENT_XML);
+  const events = new VowelAnchoredTimingStrategy().toPhoneEvents(
+    score,
+    new VietnameseMoraPlanTranspiler(),
+  );
+  const secondOnset = events.find((event) => event.note.lyric === "dạ" && event.phoneme === "z");
+  const previousTail = events.find((event) => event.note.lyric === "kiên" && event.phoneme === "N");
+
+  expect(secondOnset?.start).toBe(5820000);
+  expect(secondOnset?.end).toBe(6220000);
+  expect(previousTail?.end).toBe(5820000);
+});
+
+test("timing does not turn missing lyric pitched notes into pau", () => {
+  const score = new DomMusicXmlParser().parse(NO_LYRIC_XML);
+  const events = new VowelAnchoredTimingStrategy().toPhoneEvents(
+    score,
+    new VietnameseMoraPlanTranspiler(),
+  );
+
+  expect(events.map((event) => event.phoneme)).toEqual(["pau"]);
+});
+
+test("MusicXML dynamics and articulation feed expression gauges", () => {
+  const note = new DomMusicXmlParser().parse(ADJACENT_XML).notes[0]!;
+  const expression = expressionForNote(note, null, null);
+
+  expect(note.dynamic).toBe("f");
+  expect(note.hasAccent).toBe(true);
+  expect(expression.energy).toBe(95);
+  expect(expression.vibratoRateHz).toBe(0);
+});
+
 test("pipeline emits mono and full labels", () => {
   const result = new SinsyLabelPipeline().serialize(SIMPLE_XML);
   expect(result.mono).toContain("0 400000 k");
   expect(result.full).toContain("/E:C4]60^0=2/4~100");
-  expect(result.full).toContain("/F:C4#60#0-2/4$100$1+60%2;");
+  expect(result.full).toContain("/F:xx#xx#xx-xx$xx$xx+xx%xx;");
 });
 
 test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {

@@ -53,6 +53,7 @@ export class SinsyLabelPipeline {
 }
 
 export * from "./emitters.ts";
+export * from "./expression.ts";
 export * from "./musicxml.ts";
 export * from "./mora-plan.ts";
 export * from "./phoneme.ts";

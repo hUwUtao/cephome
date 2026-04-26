@@ -1,4 +1,5 @@
-import type { LabelEmitter, PhoneEvent } from "./types.ts";
+import { expressionForNote } from "./expression.ts";
+import type { LabelEmitter, PhoneEvent, ScoreNote } from "./types.ts";
 
 const P_SEP = ["", "@", "^", "-", "+", "=", "_", "%", "^", "_", "~", "-", "!", "[", "$", "]"];
 const A_SEP = ["/A:", "-", "-", "@", "~"];
@@ -91,6 +92,9 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
   private contextFor(events: PhoneEvent[], index: number): string {
     const event = events[index]!;
     const note = event.note;
+    const previousNote = distinctNote(events, index, -1);
+    const nextNote = distinctNote(events, index, 1);
+    const expression = expressionForNote(note, previousNote, nextNote);
     const pitch = note.pitch?.name ?? "xx";
     const beat = `${note.beat.beats}/${note.beat.beatType}`;
     const tempo = String(Math.round(note.tempo));
@@ -124,27 +128,34 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     c[4] = "0";
 
     const d = fill(9);
+    fillNoteSummary(d, previousNote);
+
     const e = fill(60);
     e[0] = pitch;
     e[1] = String(note.pitch?.midi ?? 0);
-    e[2] = "0";
+    e[2] = String(expression.pitchDeltaFromPrev);
     e[3] = beat;
     e[4] = tempo;
     e[5] = "1";
-    e[26] = note.slur === "stop" || note.tie === "stop" || note.tie === "continue" ? "1" : "0";
-    e[27] = note.slur === "start" || note.tie === "start" || note.tie === "continue" ? "1" : "0";
+    e[25] = note.slur === "stop" || note.tie === "stop" || note.tie === "continue" ? "1" : "0";
+    e[26] = note.slur === "start" || note.tie === "start" || note.tie === "continue" ? "1" : "0";
+    e[27] = note.dynamic;
+    e[28] = String(expression.vibratoRateHz);
+    e[29] = String(expression.vibratoDepthCents);
+    e[30] = String(Math.round(expression.vibratoStartRatio * 100));
+    e[31] = String(expression.energy);
+    e[34] = note.hasStaccato ? "1" : "0";
+    e[35] = note.hasStaccato ? "1" : "0";
+    e[40] =
+      expression.pitchDeltaFromPrev < 0 ? String(Math.abs(expression.pitchDeltaFromPrev)) : "0";
+    e[41] = expression.pitchDeltaToNext > 0 ? String(expression.pitchDeltaToNext) : "0";
+    e[48] = String(expression.pitchDeltaFromPrev);
+    e[49] = String(expression.pitchDeltaToNext);
     e[58] = "0";
     e[59] = note.hasBreath ? "1" : "0";
 
     const f = fill(9);
-    f[0] = pitch;
-    f[1] = String(note.pitch?.midi ?? 0);
-    f[2] = "0";
-    f[3] = beat;
-    f[4] = tempo;
-    f[5] = "1";
-    f[6] = durationCentiseconds(note);
-    f[7] = String(note.durationDiv);
+    fillNoteSummary(f, nextNote);
 
     const g = fill(2);
     const h = fill(2);
@@ -184,7 +195,28 @@ function clamp(value: number, max: number): number {
   return Math.min(Math.max(value, 0), max);
 }
 
-function durationCentiseconds(event: PhoneEvent["note"]): string {
+function fillNoteSummary(values: string[], note: ScoreNote | null): void {
+  if (!note) return;
+  values[0] = note.pitch?.name ?? "xx";
+  values[1] = String(note.pitch?.midi ?? 0);
+  values[2] = "0";
+  values[3] = `${note.beat.beats}/${note.beat.beatType}`;
+  values[4] = String(Math.round(note.tempo));
+  values[5] = "1";
+  values[6] = durationCentiseconds(note);
+  values[7] = String(note.durationDiv);
+}
+
+function distinctNote(events: PhoneEvent[], index: number, direction: -1 | 1): ScoreNote | null {
+  const currentId = events[index]!.note.id;
+  for (let cursor = index + direction; cursor >= 0 && cursor < events.length; cursor += direction) {
+    const note = events[cursor]!.note;
+    if (note.id !== currentId && !note.isRest) return note;
+  }
+  return null;
+}
+
+function durationCentiseconds(event: ScoreNote): string {
   return String(
     clamp(Math.floor((event.durationDiv / event.divisions) * (60 / event.tempo) * 100), 499),
   );

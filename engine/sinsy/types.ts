@@ -38,6 +38,9 @@ export interface ScoreNote {
   tie: "start" | "stop" | "continue" | null;
   slur: "start" | "stop" | null;
   hasBreath: boolean;
+  dynamic: string;
+  hasAccent: boolean;
+  hasStaccato: boolean;
 }
 
 export interface ScoreDocument {
@@ -67,9 +70,19 @@ export interface PhoneEvent {
   end: number;
   phoneme: string;
   cls: PhoneClass;
+  role: PhoneRole;
   note: ScoreNote;
   phoneIndexInNote: number;
   phoneCountInNote: number;
+}
+
+export interface ExpressionGauge {
+  energy: number;
+  vibratoRateHz: number;
+  vibratoDepthCents: number;
+  vibratoStartRatio: number;
+  pitchDeltaFromPrev: number;
+  pitchDeltaToNext: number;
 }
 
 export interface MusicXmlParser {

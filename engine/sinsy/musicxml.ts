@@ -30,6 +30,7 @@ interface ParseState {
   divisions: number;
   tempo: number;
   beat: ScoreBeat;
+  dynamic: string;
 }
 
 export class DomMusicXmlParser implements MusicXmlParser {
@@ -57,6 +58,7 @@ export class DomMusicXmlParser implements MusicXmlParser {
       divisions: initialDivisions,
       tempo: 120,
       beat: { beats: 4, beatType: 4 },
+      dynamic: "mf",
     };
     let cursorDiv = 0;
     let lastNoteStartDiv = 0;
@@ -75,6 +77,7 @@ export class DomMusicXmlParser implements MusicXmlParser {
             break;
           case "direction":
             state.tempo = directionTempo(child) ?? state.tempo;
+            state.dynamic = directionDynamic(child) ?? state.dynamic;
             break;
           case "backup":
             cursorDiv -= durationOf(child);
@@ -158,6 +161,9 @@ export class DomMusicXmlParser implements MusicXmlParser {
       tie: tieOf(note),
       slur: slurOf(note),
       hasBreath: first(note, "breath-mark") !== null,
+      dynamic: meta.state.dynamic,
+      hasAccent: first(note, "accent") !== null || first(note, "strong-accent") !== null,
+      hasStaccato: first(note, "staccato") !== null,
     };
   }
 }
@@ -198,6 +204,13 @@ function directionTempo(direction: XmlElement): number | null {
   if (soundTempo !== null) return soundTempo;
   const perMinute = first(direction, "per-minute");
   return numberText(perMinute);
+}
+
+function directionDynamic(direction: XmlElement): string | null {
+  const dynamics = first(direction, "dynamics");
+  if (!dynamics) return null;
+  const child = directElementChildren(dynamics)[0];
+  return child ? tagName(child) : null;
 }
 
 function durationOf(parent: XmlElement): number {
