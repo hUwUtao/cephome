@@ -3,34 +3,12 @@ import { onsetToPhonemes } from "../onset.ts";
 import { segmentSyllable } from "../segment.ts";
 import type { RoleAwareLyricTranspiler, SyllablePhonePlan, TimedPhonePlan } from "./types.ts";
 import { validateSinsyPhones } from "./phoneme.ts";
+import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "./vietnamese-metadata.ts";
 
-const VOWEL_SIGNATURES: Record<string, number> = {
-  a: 1,
-  ă: 2,
-  â: 3,
-  e: 4,
-  ê: 5,
-  o: 6,
-  ô: 7,
-  ơ: 8,
-  i: 9,
-  y: 9,
-  u: 10,
-  ư: 11,
-  iê: 12,
-  ia: 12,
-  uô: 13,
-  ua: 13,
-  ươ: 14,
-  ưa: 14,
-  oa: 15,
-  oe: 15,
-  yê: 12,
-  uyê: 16,
-};
+type SinsyVietnameseMode = "transparent" | "voicevox" | "singing";
 
 export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
-  constructor(private readonly mode: "transparent" | "voicevox" = "voicevox") {}
+  constructor(private readonly mode: SinsyVietnameseMode = "singing") {}
 
   transpile(lyric: string): SyllablePhonePlan {
     return this.plan(lyric);
@@ -39,20 +17,18 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
   plan(lyric: string): SyllablePhonePlan {
     try {
       const parsed = segmentSyllable(lyric);
+      const metadata = metadataForLyric(lyric);
       const plan: TimedPhonePlan[] = [];
 
-      for (const phone of onsetToPhonemes(parsed.onset)) {
-        plan.push({ phone, role: "pre", weight: 1 });
-      }
+      plan.push(...onsetPlan(parsed.onset));
       if (parsed.medial === "w") {
-        plan.push({ phone: "u", role: "pre", weight: 0.6 });
+        plan.push({ phone: "w", role: "pre", weight: 0.22 });
       }
 
-      const nucleus = nucleusToPhonemes(parsed.nucleus);
+      const nucleus = nucleusPhones(parsed.onset, parsed.nucleus, this.mode);
       // ă and â are inherently short vowels
       const isShortVowel = ["ă", "â"].includes(parsed.nucleus);
       const vowelWeight = isShortVowel ? 0.5 : 1.0;
-
       nucleus.forEach((phone, index) => {
         plan.push({
           phone,
@@ -61,13 +37,11 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
         });
       });
 
-      for (const phone of codaToPhonemes(parsed.coda, parsed.tone, this.mode)) {
-        plan.push({ phone, role: "tail", weight: phone === "cl" ? 0.5 : 0.8 });
+      for (const phone of codaPhones(parsed.coda, parsed.tone, this.mode)) {
+        plan.push({ phone, role: "tail", weight: tailWeight(phone) });
       }
 
-      const vowelSign = VOWEL_SIGNATURES[parsed.nucleus] ?? 0;
-
-      return filterPlan(lyric, parsed.tone, vowelSign, plan);
+      return filterPlan(lyric, parsed.tone, metadata.vowelSign, metadata, plan);
     } catch (error) {
       const reason = error instanceof Error ? error.message.toLowerCase() : "unknown error";
       return {
@@ -75,6 +49,7 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
         phones: [],
         tone: 0,
         vowelSign: 0,
+        metadata: DEFAULT_VIETNAMESE_METADATA,
         plan: [],
         warnings: [`${lyric}: ${reason}`],
       };
@@ -82,10 +57,42 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
   }
 }
 
+function onsetPlan(onset: string): TimedPhonePlan[] {
+  if (onset === "th") {
+    return [
+      { phone: "t", role: "pre", weight: 0.7 },
+      { phone: "h", role: "pre", weight: 0.45 },
+    ];
+  }
+  return onsetToPhonemes(onset).map((phone) => ({ phone, role: "pre", weight: 1 }));
+}
+
+function codaPhones(coda: string, tone: number, mode: SinsyVietnameseMode): string[] {
+  if (mode !== "singing") return codaToPhonemes(coda, tone, mode);
+  if (coda === "p") return ["p"];
+  if (coda === "t") return ["t"];
+  if (["c", "ch"].includes(coda)) return ["k"];
+  if (coda === "ng") return tone === 4 || tone === 5 ? ["N", "g", "cl"] : ["N", "g"];
+  return codaToPhonemes(coda, tone, "voicevox");
+}
+
+function nucleusPhones(onset: string, nucleus: string, mode: SinsyVietnameseMode): string[] {
+  if (mode === "singing" && onset === "th" && nucleus === "oa") return ["o", "a"];
+  return nucleusToPhonemes(nucleus);
+}
+
+function tailWeight(phone: string): number {
+  if (phone === "cl") return 0.45;
+  if (phone === "g") return 0.55;
+  if (["p", "t", "k"].includes(phone)) return 0.55;
+  return 0.8;
+}
+
 function filterPlan(
   source: string,
   tone: number,
   vowelSign: number,
+  metadata: SyllablePhonePlan["metadata"],
   plan: TimedPhonePlan[],
 ): SyllablePhonePlan {
   const invalid = validateSinsyPhones(plan.map((item) => item.phone));
@@ -95,7 +102,8 @@ function filterPlan(
     phones: filtered.map((item) => item.phone),
     tone,
     vowelSign,
-    plan: filtered.map((f) => ({ ...f, vowelSign })),
+    metadata,
+    plan: filtered.map((f) => ({ ...f, vowelSign, metadata })),
     warnings: invalid.map((phone) => `${source}: unsupported Sinsy phone "${phone}"`),
   };
 }

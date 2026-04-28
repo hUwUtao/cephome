@@ -1,11 +1,28 @@
 export type PhoneClass = "v" | "c" | "p";
 export type PhoneRole = "pre" | "anchor" | "tail" | "breath";
+export type NucleusClass = "none" | "single" | "diphthong" | "triphthong";
+export type CodaClass = "none" | "glide" | "nasal" | "stop";
+export type RhymeClass = "open" | "glide" | "nasal" | "checked";
+export type PhonationClass = "modal" | "creaky" | "glottalized" | "checked";
+export type ToneMelodyRelation = "level" | "parallel" | "oblique" | "contrary";
+
+export interface VietnameseSyllableMetadata {
+  tone: number;
+  vowelSign: number;
+  nucleusClass: NucleusClass;
+  codaClass: CodaClass;
+  rhymeClass: RhymeClass;
+  phonation: PhonationClass;
+  glottalization: number;
+  codaTransition: number;
+}
 
 export interface ScorePitch {
   step: string;
   alter: number;
   octave: number;
   midi: number;
+  pitchClass: number;
   name: string;
 }
 
@@ -55,6 +72,7 @@ export interface LyricTranspilation {
   phones: string[];
   tone: number;
   vowelSign: number;
+  metadata: VietnameseSyllableMetadata;
   warnings: string[];
 }
 
@@ -63,6 +81,7 @@ export interface TimedPhonePlan {
   role: PhoneRole;
   weight: number;
   vowelSign?: number;
+  metadata?: VietnameseSyllableMetadata;
 }
 
 export interface SyllablePhonePlan extends LyricTranspilation {
@@ -78,6 +97,7 @@ export interface PhoneEvent {
   note: ScoreNote;
   tone: number;
   vowelSign: number;
+  metadata: VietnameseSyllableMetadata;
   phoneIndexInNote: number;
   phoneCountInNote: number;
 }
@@ -90,6 +110,7 @@ export interface ExpressionGauge {
   pitchDeltaFromPrev: number;
   pitchDeltaToNext: number;
   tonalPitchOffset: number;
+  toneMelodyRelation: ToneMelodyRelation;
 }
 
 export interface MusicXmlParser {

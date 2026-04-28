@@ -1,5 +1,6 @@
 import { expressionForNote } from "./expression.ts";
 import type { LabelEmitter, PhoneEvent, ScoreNote } from "./types.ts";
+import { encodeVietnameseMetadata } from "./vietnamese-metadata.ts";
 
 const P_SEP = ["", "@", "^", "-", "+", "=", "_", "%", "^", "_", "~", "-", "!", "[", "$", "]"];
 const A_SEP = ["/A:", "-", "-", "@", "~"];
@@ -76,11 +77,7 @@ const J_SEP = ["/J:", "~", "@"];
 
 export class MonoLabelEmitter implements LabelEmitter {
   emit(events: PhoneEvent[]): string {
-    return (
-      ["0 0 pau", ...events.map((event) => `${event.start} ${event.end} ${event.phoneme}`)].join(
-        "\n",
-      ) + "\n"
-    );
+    return events.map((event) => `${event.start} ${event.end} ${event.phoneme}`).join("\n") + "\n";
   }
 }
 
@@ -112,6 +109,7 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     const phoneCount = clamp(event.phoneCountInNote, 9);
     const phonePos = clamp(event.phoneIndexInNote + 1, 9);
     const phoneRemain = clamp(event.phoneCountInNote - event.phoneIndexInNote, 9);
+    const vietnameseContext = encodeVietnameseMetadata(event.metadata);
 
     const p = fill(16);
     p[0] = event.cls;
@@ -130,20 +128,20 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     b[1] = "1";
     b[2] = "1";
     b[3] = "VIE"; // Vietnamese marker
-    b[4] = `${event.tone}|${event.vowelSign}`; // Tone 0-5 and Vowel Signature
+    b[4] = vietnameseContext;
 
     c[0] = "1";
     c[1] = "1";
     c[2] = "1";
     c[3] = "VIE";
-    c[4] = `${event.tone}|${event.vowelSign}`;
+    c[4] = vietnameseContext;
 
     const d = fill(9);
     fillNoteSummary(d, previousNote);
 
     const e = fill(60);
     e[0] = pitch;
-    e[1] = String(Math.round((note.pitch?.midi ?? 0) + expression.tonalPitchOffset));
+    e[1] = String(note.pitch?.pitchClass ?? 0);
     e[2] = String(expression.pitchDeltaFromPrev);
     e[3] = beat;
     e[4] = tempo;
@@ -209,7 +207,7 @@ function clamp(value: number, max: number): number {
 function fillNoteSummary(values: string[], note: ScoreNote | null): void {
   if (!note) return;
   values[0] = note.pitch?.name ?? "xx";
-  values[1] = String(note.pitch?.midi ?? 0);
+  values[1] = String(note.pitch?.pitchClass ?? 0);
   values[2] = "0";
   values[3] = `${note.beat.beats}/${note.beat.beatType}`;
   values[4] = String(Math.round(note.tempo));

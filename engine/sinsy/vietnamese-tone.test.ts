@@ -68,7 +68,7 @@ test("Tonal pitch microtoning calculation", () => {
     staff: "1",
     startDiv: 0,
     endDiv: 2,
-    pitch: { step: "C", alter: 0, octave: 4, midi: 60, name: "C4" },
+    pitch: { step: "C", alter: 0, octave: 4, midi: 60, pitchClass: 0, name: "C4" },
     durationDiv: 2,
     divisions: 2,
     tempo: 120,
@@ -101,7 +101,7 @@ test("Tonal pitch microtoning calculation", () => {
   expect(exp1_2.tonalPitchOffset).toBeLessThan(0);
 });
 
-test("Sinsy labels contain Vietnamese tone information", () => {
+test("Sinsy labels contain Vietnamese tone metadata without mutating score pitch", () => {
   const pipeline = new SinsyLabelPipeline();
   const result = pipeline.serialize(TONAL_XML);
 
@@ -111,12 +111,8 @@ test("Sinsy labels contain Vietnamese tone information", () => {
   expect(result.full).toContain("@VIE|4"); // 'ngã' (tone 4)
   expect(result.full).toContain("@VIE|0"); // 'mây' (tone 0)
 
-  // Check for microtoning in E section (midi field)
-  // 'dạ' (tone 5) should have decreasing midi values for later phonemes if rounded
-  // 'z' (pos 0), 'a' (pos 1), 'cl' (pos 2)
-  // tone 5 offset for pos 2 of 3 is -0.7 * (2/2) = -0.7.
-  // midi 60 - 0.7 = 59.3 -> rounded to 59.
-  expect(result.full).toContain("]59^");
+  expect(result.full).toContain("/E:C4]0^");
+  expect(result.full).not.toContain("/E:C4]60^");
 });
 
 test("Vowel signature and short-vowel timing", () => {
@@ -139,4 +135,57 @@ test("Vowel signature and short-vowel timing", () => {
   expect(trang.vowelSign).toBe(2);
   const vowelAW = trang.plan.find((p) => p.phone === "a");
   expect(vowelAW?.weight).toBe(0.5);
+});
+
+test("Sinsy singing plan keeps checked codas without artificial support glides", () => {
+  const transpiler = new VietnameseMoraPlanTranspiler();
+
+  expect(transpiler.plan("thấp").phones).toEqual(["t", "h", "a", "p"]);
+  expect(transpiler.plan("nếp").phones).toEqual(["n", "e", "p"]);
+  expect(transpiler.plan("nước").phones).toEqual(["n", "u", "o", "k"]);
+  expect(transpiler.plan("thênh").phones).toEqual(["t", "h", "e", "N"]);
+  expect(transpiler.plan("tôi").phones).toEqual(["t", "o", "i"]);
+  expect(transpiler.plan("xuôi").phones).toEqual(["s", "w", "o", "i"]);
+  expect(transpiler.plan("chung").phones).toEqual(["ch", "u", "N", "g"]);
+  expect(transpiler.plan("trên").phones).toEqual(["ty", "z", "e", "N"]);
+  expect(transpiler.plan("thoáng").phones).toEqual(["t", "h", "o", "a", "N", "g"]);
+});
+
+test("Vietnamese plan exposes research metadata tiers", () => {
+  const transpiler = new VietnameseMoraPlanTranspiler();
+
+  const khat = transpiler.plan("khát");
+  expect(khat.metadata.rhymeClass).toBe("checked");
+  expect(khat.metadata.codaClass).toBe("stop");
+  expect(khat.metadata.codaTransition).toBe(3);
+  expect(khat.metadata.phonation).toBe("checked");
+
+  const nga = transpiler.plan("ngã");
+  expect(nga.metadata.rhymeClass).toBe("open");
+  expect(nga.metadata.phonation).toBe("glottalized");
+  expect(nga.metadata.glottalization).toBe(2);
+});
+
+test("Sinsy labels keep compact NEUTRINO-safe Vietnamese context", () => {
+  const xml = TONAL_XML.replace(
+    "<pitch><step>C</step><octave>4</octave></pitch>\n        <duration>2</duration>\n        <voice>1</voice>\n        <lyric><text>ngã</text></lyric>",
+    "<pitch><step>D</step><octave>4</octave></pitch>\n        <duration>2</duration>\n        <voice>1</voice>\n        <lyric><text>ngã</text></lyric>",
+  );
+  const result = new SinsyLabelPipeline().serialize(xml);
+
+  expect(result.full).toContain("@VIE|4|1");
+  expect(result.full).toContain("@VIE|5|1");
+  expect(result.full).not.toContain("glottalized");
+  expect(result.full).not.toContain("contrary");
+});
+
+test("low A3 lyrics keep exact score pitch class in full labels", () => {
+  const xml = TONAL_XML.replaceAll(
+    "<step>C</step><octave>4</octave>",
+    "<step>A</step><octave>3</octave>",
+  ).replace("<text>mây</text>", "<text>Dừng</text>");
+  const result = new SinsyLabelPipeline().serialize(xml);
+
+  expect(result.full).toContain("/E:A3]9^");
+  expect(result.full).not.toContain("/E:A3]57^");
 });

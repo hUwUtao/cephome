@@ -26,6 +26,7 @@ const PITCH_CLASS: Record<string, number> = {
   A: 9,
   B: 11,
 };
+const SINSY_PITCH_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
 interface ParseState {
   divisions: number;
@@ -181,8 +182,20 @@ function pitchOf(pitch: XmlElement | null): ScorePitch | null {
   const alter = numberText(first(pitch, "alter")) ?? 0;
   const octave = numberText(first(pitch, "octave")) ?? 4;
   const midi = (octave + 1) * 12 + (PITCH_CLASS[step] ?? 0) + alter;
-  const suffix = alter === 1 ? "#" : alter === -1 ? "b" : "";
-  return { step, alter, octave, midi, name: `${step}${suffix}${octave}` };
+  const pitchClass = positiveModulo(midi, 12);
+  const labelOctave = Math.floor(midi / 12) - 1;
+  return {
+    step,
+    alter,
+    octave,
+    midi,
+    pitchClass,
+    name: `${SINSY_PITCH_NAMES[pitchClass]}${labelOctave}`,
+  };
+}
+
+function positiveModulo(value: number, base: number): number {
+  return ((value % base) + base) % base;
 }
 
 function tieOf(note: XmlElement): ScoreNote["tie"] {

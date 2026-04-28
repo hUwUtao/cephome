@@ -25,6 +25,11 @@ export interface SinsySerializationResult {
   full: string;
 }
 
+export interface SinsySerializationTrace extends SinsySerializationResult {
+  score: ReturnType<ScoreNormalizer["normalize"]>;
+  events: ReturnType<TimingStrategy["toPhoneEvents"]>;
+}
+
 export class SinsyLabelPipeline {
   private readonly parser: MusicXmlParser;
   private readonly normalizer: ScoreNormalizer;
@@ -43,9 +48,19 @@ export class SinsyLabelPipeline {
   }
 
   serialize(xml: string, sourceName?: string): SinsySerializationResult {
+    const result = this.serializeTrace(xml, sourceName);
+    return {
+      mono: result.mono,
+      full: result.full,
+    };
+  }
+
+  serializeTrace(xml: string, sourceName?: string): SinsySerializationTrace {
     const score = this.normalizer.normalize(this.parser.parse(xml, sourceName));
     const events = this.timing.toPhoneEvents(score, this.lyricTranspiler);
     return {
+      score,
+      events,
       mono: this.monoEmitter.emit(events),
       full: this.fullEmitter.emit(events),
     };

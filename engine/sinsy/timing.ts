@@ -9,6 +9,7 @@ import type {
   TimingStrategy,
 } from "./types.ts";
 import { classifyPhone } from "./phoneme.ts";
+import { DEFAULT_VIETNAMESE_METADATA } from "./vietnamese-metadata.ts";
 
 export class CumulativeFloatTimingStrategy implements TimingStrategy {
   toPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {
@@ -33,6 +34,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
       const tone = note.carriedTone ?? transpiled?.tone ?? 0;
       const vowelSign = transpiled?.vowelSign ?? 0;
+      const metadata = transpiled?.metadata ?? DEFAULT_VIETNAMESE_METADATA;
       phones.forEach((phoneme, index) => {
         events.push({
           start,
@@ -43,6 +45,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
           note,
           tone,
           vowelSign,
+          metadata,
           phoneIndexInNote: index,
           phoneCountInNote: phones.length,
         });
@@ -104,6 +107,7 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
       const tone = note.carriedTone ?? transpiled?.tone ?? 0;
       const vowelSign = transpiled?.vowelSign ?? 0;
+      const metadata = transpiled?.metadata ?? DEFAULT_VIETNAMESE_METADATA;
       const windows = assignPhoneWindows(planResult, start, end, this.options);
       windows.forEach((window, index) => {
         events.push({
@@ -115,6 +119,7 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
           note,
           tone,
           vowelSign,
+          metadata: window.metadata ?? metadata,
           phoneIndexInNote: index,
           phoneCountInNote: windows.length,
         });
@@ -194,6 +199,9 @@ function assignPhoneWindows(
 
   let preDur =
     pre.length > 0 ? Math.min(total * options.preRatio, options.maxPreSeconds * 10_000_000) : 0;
+  if (pre.length > 0 && pre.every((item) => item.phone === "w")) {
+    preDur *= Math.max(...pre.map((item) => item.weight));
+  }
   let tailDur =
     tail.length > 0 ? Math.min(total * options.tailRatio, options.maxTailSeconds * 10_000_000) : 0;
   const nonAnchorLimit = total * options.maxNonAnchorRatio;

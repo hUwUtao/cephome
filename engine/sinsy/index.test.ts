@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -163,6 +163,49 @@ const NO_LYRIC_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </part>
 </score-partwise>`;
 
+const SHARP_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <direction><sound tempo="100"/></direction>
+      <note>
+        <pitch><step>C</step><alter>1</alter><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <lyric><text>chân</text></lyric>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+function scoreWithPitches(pitches: string[]): string {
+  const notes = pitches
+    .map(
+      (pitch) => `
+      <note>
+        <pitch>${pitch}</pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <lyric><text>la</text></lyric>
+      </note>`,
+    )
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <direction><sound tempo="100"/></direction>
+      ${notes}
+    </measure>
+  </part>
+</score-partwise>`;
+}
+
 test("MusicXML parser builds note data structure", () => {
   const score = new DomMusicXmlParser().parse(SIMPLE_XML, "simple.musicxml");
   expect(score.divisions).toBe(2);
@@ -171,6 +214,38 @@ test("MusicXML parser builds note data structure", () => {
   expect(score.notes[0]?.pitch?.midi).toBe(60);
   expect(score.notes[0]?.beat).toEqual({ beats: 2, beatType: 4 });
   expect(score.notes[1]?.isRest).toBe(true);
+});
+
+test("MusicXML parser keeps accidental pitch names separator-safe", () => {
+  const score = new DomMusicXmlParser().parse(SHARP_XML, "sharp.musicxml");
+
+  expect(score.notes[0]?.pitch?.name).toBe("Db4");
+  expect(score.notes[0]?.pitch?.midi).toBe(61);
+  expect(score.notes[0]?.pitch?.pitchClass).toBe(1);
+});
+
+test("MusicXML parser canonicalizes natural, flat, sharp, and double accidentals", () => {
+  const score = new DomMusicXmlParser().parse(
+    scoreWithPitches([
+      "<step>C</step><octave>4</octave>",
+      "<step>C</step><alter>1</alter><octave>4</octave>",
+      "<step>D</step><alter>-1</alter><octave>4</octave>",
+      "<step>F</step><alter>2</alter><octave>4</octave>",
+      "<step>C</step><alter>-1</alter><octave>4</octave>",
+      "<step>B</step><alter>1</alter><octave>4</octave>",
+    ]),
+    "accidentals.musicxml",
+  );
+
+  expect(score.notes.map((note) => note.pitch?.name)).toEqual([
+    "C4",
+    "Db4",
+    "Db4",
+    "G4",
+    "B3",
+    "C5",
+  ]);
+  expect(score.notes.map((note) => note.pitch?.pitchClass)).toEqual([0, 1, 1, 7, 11, 0]);
 });
 
 test("vocal normalizer selects lyric voice, merges ties, carries slur vowel, drops chord/hidden", () => {
@@ -203,15 +278,9 @@ test("cumulative timing keeps whole-note phoneme windows", () => {
   );
   const mono = new MonoLabelEmitter().emit(events);
   expect(mono).toBe(
-    [
-      "0 0 pau",
-      "0 6000000 k",
-      "0 6000000 i",
-      "0 6000000 e",
-      "0 6000000 N",
-      "6000000 12000000 pau",
-      "",
-    ].join("\n"),
+    ["0 6000000 k", "0 6000000 i", "0 6000000 e", "0 6000000 N", "6000000 12000000 pau", ""].join(
+      "\n",
+    ),
   );
 });
 
@@ -224,7 +293,6 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   const mono = new MonoLabelEmitter().emit(events);
   expect(mono).toBe(
     [
-      "0 0 pau",
       "0 400000 k",
       "400000 4800000 i",
       "4800000 5360000 e",
@@ -271,16 +339,23 @@ test("MusicXML dynamics and articulation feed expression gauges", () => {
 
 test("pipeline emits mono and full labels", () => {
   const result = new SinsyLabelPipeline().serialize(SIMPLE_XML);
-  expect(result.mono.startsWith("0 0 pau\n")).toBe(true);
-  expect(result.mono).toContain("0 400000 k");
-  expect(result.full).toContain("/E:C4]60^0=2/4~100");
+  expect(result.mono.startsWith("0 400000 k\n")).toBe(true);
+  expect(result.full).toContain("/E:C4]0^0=2/4~100");
   expect(result.full).toContain("/F:xx#xx#xx-xx$xx$xx+xx%xx;");
+});
+
+test("pipeline does not leak full-label separators inside accidental pitch fields", () => {
+  const result = new SinsyLabelPipeline().serialize(SHARP_XML);
+
+  expect(result.full).toContain("/E:Db4]1^");
+  expect(result.full).not.toContain("/E:C#4]");
+  expect(result.full).not.toContain("/E:Cs4]");
 });
 
 test("rule API decodes MusicXML bytes", () => {
   const result = transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
   expect(result.mono).toContain("0 400000 k");
-  expect(result.full).toContain("/E:C4]60^0=2/4~100");
+  expect(result.full).toContain("/E:C4]0^0=2/4~100");
 });
 
 test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
@@ -302,7 +377,8 @@ test("musicXMLtoLabel runner writes full and mono files", () => {
     runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
 
     expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
-    expect(readFileSync(full, "utf8")).toContain("/E:C4]60^0=2/4~100");
+    expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
+    expect(statSync(join(dir, "score", "label", "timing")).isDirectory()).toBe(true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -379,7 +455,7 @@ test("musicXMLtoLabel accepts Windows-style separators on POSIX", () => {
       monoLabelPath: mono.replaceAll("/", "\\"),
     });
 
-    expect(readFileSync(full, "utf8")).toContain("/E:C4]60^0=2/4~100");
+    expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
     expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -58,7 +58,7 @@ export function segmentSyllable(raw: string): ParsedSyllable {
   let medial = "";
   if (onset === "qu") {
     medial = "w"; // qu → [k] + medial w
-  } else if (["h", "x", "ph", "kh", "th"].includes(onset) && remaining && remaining.length > 1) {
+  } else if (["h", "x", "ph", "kh"].includes(onset) && remaining && remaining.length > 1) {
     // Check if next char is u/ư/o/ô (glide-start)
     const firstChar: string = remaining[0] as string;
     if (["u", "ư", "o", "ô"].includes(firstChar)) {

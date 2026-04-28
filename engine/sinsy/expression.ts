@@ -1,4 +1,4 @@
-import type { ExpressionGauge, ScoreNote } from "./types.ts";
+import type { ExpressionGauge, ScoreNote, ToneMelodyRelation } from "./types.ts";
 
 const DYNAMIC_ENERGY: Record<string, number> = {
   pppp: 20,
@@ -36,6 +36,7 @@ export function expressionForNote(
     pitchDeltaFromPrev: pitchDelta(previousNote, note),
     pitchDeltaToNext: pitchDelta(note, nextNote),
     tonalPitchOffset: calculateTonalOffset(tone, phoneIndex, phoneCount),
+    toneMelodyRelation: calculateToneMelodyRelation(tone, pitchDelta(note, nextNote)),
   };
 }
 
@@ -60,6 +61,19 @@ function calculateTonalOffset(tone: number, index: number, count: number): numbe
     default:
       return 0;
   }
+}
+
+function calculateToneMelodyRelation(tone: number, nextDelta: number): ToneMelodyRelation {
+  const preferredDirection = toneDirection(tone);
+  if (preferredDirection === 0) return "level";
+  if (nextDelta === 0) return "oblique";
+  return Math.sign(nextDelta) === preferredDirection ? "parallel" : "contrary";
+}
+
+function toneDirection(tone: number): -1 | 0 | 1 {
+  if (tone === 1 || tone === 5) return -1;
+  if (tone === 2 || tone === 4) return 1;
+  return 0;
 }
 
 export function noteDurationSeconds(note: ScoreNote): number {

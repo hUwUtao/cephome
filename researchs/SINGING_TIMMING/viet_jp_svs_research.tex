@@ -1,0 +1,439 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setmainfont{Noto Serif}
+\setsansfont{Noto Sans}
+\setmonofont{Noto Sans Mono}
+\setCJKmainfont{Noto Serif CJK JP}
+\setCJKsansfont{Noto Sans CJK JP}
+\setCJKmonofont{Noto Sans CJK JP}
+\usepackage[a4paper,margin=2.55cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{xurl}
+\usepackage{fvextra}
+\usepackage{csquotes}
+\usepackage[unicode=true,colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black,urlcolor=blue!55!black]{hyperref}
+\usepackage[backend=biber,style=authoryear,sorting=nyt,maxcitenames=2,maxbibnames=99,url=true,doi=true,isbn=false]{biblatex}
+\setlength{\emergencystretch}{3em}
+\AtBeginBibliography{\small\sloppy}
+\addbibresource{references.bib}
+\usepackage{titlesec}
+\titleformat{\section}{\Large\bfseries\sffamily}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries\sffamily}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\sffamily}{\thesubsubsection}{0.8em}{}
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.2em,topsep=0.3em}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=0.2em,topsep=0.3em}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\ipa}[1]{\textnormal{/#1/}}
+\newcommand{\jp}[1]{{\CJKfontspec{Noto Serif CJK JP}#1}}
+\newcommand{\term}[1]{\textit{#1}}
+\newcommand{\tier}[1]{\textsc{#1}}
+\newcommand{\score}{\mathcal{S}}
+\newcommand{\voice}{\mathcal{V}}
+\newcommand{\offset}{\Delta}
+\hypersetup{pdftitle={Âm tiết, Mora và Định thời Giọng hát Việt-Nhật},pdfauthor={ChatGPT - AI-assisted research synthesis},pdfsubject={Vietnamese syllable, Japanese mora, singing voice synthesis},pdfkeywords={Vietnamese, Japanese, mora, syllable, tone, singing voice synthesis, ChatGPT, Gemini}}
+
+\title{\bfseries\sffamily Âm tiết, Mora và Định thời Giọng hát Việt--Nhật:\\Một tổng hợp phê bình liên trường phái từ ChatGPT, Gemini et al.}
+\author{Bản thảo nghiên cứu do AI hỗ trợ\\\small Tổng hợp, đối chiếu và biên tập theo yêu cầu người dùng}
+\date{28 tháng 4 năm 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Bài viết xây dựng một tổng hợp phê bình về hệ thống đọc ngữ âm tiếng Việt, hệ thống mora tiếng Nhật, nhịp độ đọc, timing vần trong hát và hệ quả đối với tổng hợp giọng hát tự động. Trên nền một bản nghiên cứu AI đối lập do người dùng cung cấp, bài này đối chiếu hai trường phái: trường phái kỹ thuật ánh xạ bản phổ - nhãn ngữ cảnh - mô hình duration, và trường phái ngữ âm thực nghiệm xem timing là kết quả của các landmark âm học như vowel onset, chuyển tiếp vần, glottalization và boundary. Lập luận chính là tiếng Nhật nên được mô hình hóa bằng mora như một đơn vị tổ chức mạnh nhưng không phải đồng hồ đẳng thời tuyệt đối; tiếng Việt nên được mô hình hóa bằng âm tiết-vần-thanh điệu như một cụm ràng buộc đa tầng, không phải một chuỗi âm tiết cô lập. Từ đó, bài đề xuất một kiến trúc nhãn liên tầng cho SVS Việt--Nhật gồm score tier, phone tier, mora/rhyme tier, tone/accent tier, phonation tier và performance-offset tier. Vai trò của ChatGPT, Gemini và các hệ AI khác được giới hạn ở mức hỗ trợ tổng thuật, tạo giả thuyết và phản biện chéo; bằng chứng vẫn phải neo vào tài liệu học thuật và dữ liệu âm thanh đo được.
+\end{abstract}
+
+\noindent\textbf{Từ khóa:} âm tiết tiếng Việt; mora tiếng Nhật; thanh điệu; pitch accent; vần; vowel onset; singing voice synthesis; Sinsy; NEUTRINO; ChatGPT; Gemini; AI-assisted research.
+
+\tableofcontents
+\newpage
+
+\section{Dẫn nhập: từ ngữ âm học đến kỹ thuật hát máy}
+
+Tổng hợp giọng hát không chỉ là bài toán phát âm đúng một chuỗi chữ. Nó là bài toán ép một hệ thống ngữ âm tự nhiên vào lưới thời gian của âm nhạc, nơi bản phổ quy định pitch, beat, note duration và đôi khi cả cường độ, trong khi người hát thực tế lại tạo ra hàng loạt lệch pha nhỏ: phụ âm đi trước phách, nguyên âm bám vào beat, vần bị kéo giãn, thanh điệu bị melody che phủ một phần, và vibrato làm mờ đường F0 lexical. Vì vậy, để nghiên cứu timing của tiếng Việt và tiếng Nhật trong hát, ta phải nối ba tầng: âm vị học, ngữ âm thực nghiệm và mô hình hóa kỹ thuật.
+
+Bản nghiên cứu AI đối lập mà người dùng cung cấp đặt vấn đề theo hướng rất hữu ích: tiếng Việt là hệ âm tiết-thanh điệu-vần phức tạp, còn tiếng Nhật là hệ mora thuận lợi cho ánh xạ ca từ vào bản phổ \parencite{opposingResearch2026}. Cách nhìn này có giá trị vì nó đưa ngữ âm vào pipeline của hệ SVS như Sinsy, nơi bản phổ được chuyển thành nhãn ngữ cảnh, sau đó đi qua time-lag model, duration model, acoustic model và vocoder \parencite{hono2021sinsy}. Tuy nhiên, nếu biến các khái niệm như 
+\enquote{mora-timed} hay 
+\enquote{âm tiết độc lập} thành tiền đề cứng, ta sẽ bỏ sót các biến quan trọng: speech style, spontaneousness, word boundary, coarticulation, vowel onset và phonation.
+
+Bài này vì vậy không bác bỏ bản nghiên cứu đối lập, mà mở rộng nó thành một mô hình đa tầng. Ở tiếng Nhật, mora được xem là đơn vị tổ chức nhịp mạnh, đặc biệt trong đọc cẩn trọng, chữ Kana, segmentation và lyric setting. Ở tiếng Việt, âm tiết được xem là đơn vị từ vựng-ngữ âm trung tâm, nhưng phần vần mới là không gian acoustic nơi thanh điệu, nucleus, glide và coda tương tác. Trong hát, hai hệ này đều phải thương lượng với bản phổ. Nhưng cách thương lượng khác nhau: tiếng Nhật ưu tiên bảo toàn lưới mora và special morae; tiếng Việt ưu tiên bảo toàn nhận diện vần-thanh-phonation.
+
+\section{Tuyên bố phương pháp và vị trí của ChatGPT, Gemini et al.}
+
+Bài viết này là một bản tổng hợp nghiên cứu do AI hỗ trợ. Các mô hình như ChatGPT, Gemini và các hệ 
+\enquote{research AI} khác có thể giúp gom nguồn, tạo cấu trúc tranh luận, phát hiện giả định ẩn và dựng mô hình khái niệm. Theo tài liệu chính thức, GPT-4.1 được mô tả là một dòng mô hình API có khả năng xử lý ngữ cảnh dài và tuân thủ hướng dẫn tốt hơn các đời trước \parencite{openai2025gpt41}; Gemini 2.5 Pro được Google mô tả là mô hình 
+\enquote{thinking} có khả năng phân tích tài liệu và codebase dài trong Gemini API \parencite{google2026geminiModels,google2025gemini25}. Tuy nhiên, trong bài này, AI không được xem là nguồn học thuật sơ cấp. Các phát biểu khoa học được neo vào bài báo, dữ liệu, DOI hoặc nguồn kỹ thuật có thể kiểm chứng.
+
+Phương pháp tổng hợp gồm bốn bước. Thứ nhất, đọc bản nghiên cứu đối lập như một giả thuyết kỹ thuật: nếu dùng hạ tầng Sinsy/NEUTRINO cho tiếng Việt, cần thay đổi gì trong timing labels, duration model và tone handling? Thứ hai, đối chiếu với nguồn ngữ âm thực nghiệm về phụ âm cuối tiếng Việt, mora tiếng Nhật, timing trong hát và tone-melody correspondence. Thứ ba, trừu tượng hóa thành mô hình liên tầng. Thứ tư, thiết kế chương trình thực nghiệm để kiểm tra mô hình thay vì chỉ dừng ở suy luận.
+
+Cách làm này nhằm tránh hai rủi ro phổ biến của nghiên cứu do AI hỗ trợ. Rủi ro thứ nhất là 
+\term{citation laundering}: AI tạo ra một lập luận có vẻ học thuật nhưng nguồn không chứng minh đúng điều được dẫn. Rủi ro thứ hai là 
+\term{over-systematization}: biến một khuynh hướng hữu ích thành định luật phổ quát. Với chủ đề này, over-systematization thường xuất hiện dưới hai dạng: 
+\enquote{mỗi mora Nhật bằng nhau về thời lượng} và 
+\enquote{mỗi âm tiết Việt độc lập tuyệt đối}. Cả hai đều cần được viết lại thận trọng.
+
+\section{Nền tảng tiếng Việt: âm tiết, vần và thanh điệu}
+
+\subsection{Âm tiết tiếng Việt không phải một khối đều}
+
+Tiếng Việt thường được mô tả là ngôn ngữ đơn lập, âm tiết nổi bật và mỗi âm tiết có khả năng mang nghĩa. Nhưng mô tả này chỉ là điểm xuất phát. Về mặt cấu trúc, một âm tiết tiếng Việt có thể phân tích thành âm đầu, âm đệm, âm chính, âm cuối và thanh điệu. Trong cách nhìn kỹ thuật, ta có thể biểu diễn âm tiết như một tuple:
+\[
+\sigma = \langle O, G, V, C, T \rangle,
+\]
+trong đó $O$ là onset, $G$ là glide/medial, $V$ là nucleus, $C$ là coda, và $T$ là tone. Phần $R = \langle G,V,C\rangle$ là rhyme, tức miền chịu thanh điệu và là vùng quan trọng nhất để kéo dài khi hát.
+
+Bản nghiên cứu đối lập nhấn mạnh rằng âm tiết tiếng Việt gồm cấu trúc hai bậc: bậc ngoài gồm thanh điệu, âm đầu và vần; bậc trong gồm âm đệm, âm chính và âm cuối \parencite{opposingResearch2026}. Điểm này hợp lý ở mức mô hình hóa. Nhưng trong SVS, ta cần đi xa hơn: không chỉ biết các thành phần là gì, mà phải biết thành phần nào có thể kéo dài, thành phần nào phải giữ ngắn, và thành phần nào chứa cue nhận diện quan trọng.
+
+\subsection{Vần như trường acoustic, không chỉ là phần sau của âm tiết}
+
+Trong lời nói thường, người nghe tiếng Việt không nhận dạng âm cuối chỉ bằng một 
+\enquote{âm cuối} rời rạc. Nghiên cứu của \textcite{tran2019vietnameseCoda} cho thấy các phụ âm cuối vô thanh /p t k/ trong tiếng Việt thường không bật hơi ở vị trí coda; vì thiếu burst, thông tin phân biệt vị trí cấu âm nằm trong nửa sau của nguyên âm trước đó, cụ thể qua thay đổi formant, F0 và cường độ. Điều này cực kỳ quan trọng cho hát. Nếu một nốt kéo dài hai giây trên từ 
+\enquote{khát}, hệ thống không thể đơn giản kéo dài /a/ 1.95 giây rồi gắn /t/ 50 ms ở cuối. Nếu đoạn chuyển tiếp /a/ -> /t/ quá ngắn hoặc sai hình dạng, người nghe có thể nghe thành coda khác hoặc mất coda.
+
+Vì vậy, bài này đề xuất khái niệm 
+\term{trường vần} thay vì 
+\term{rhyme segment}. Trường vần có ba vùng: onset-to-vowel transition, steady nucleus và vowel-to-coda transition. Với vần mở, vùng cuối có thể tan vào nguyên âm. Với vần nửa mở, glide cuối tạo quỹ đạo âm sắc. Với vần nửa khép, nasal murmur có thể kéo dài. Với vần khép /p t k/, closure phải ngắn nhưng cue chuyển tiếp phải đủ sớm để được nhận diện.
+
+\subsection{Thanh điệu là bó đặc trưng, không chỉ là đường F0}
+
+Thanh điệu tiếng Việt có chức năng khu biệt nghĩa, nhưng không nên giản lược thành một đường cao độ. \textcite{mixdorff2003vietnameseTones} cho thấy có thể dùng Fujisaki model để tham số hóa nhiều thanh của tiếng Việt bằng tone commands, nhưng các thanh có hiện tượng glottalization như ngã và nặng cần xử lý đặc biệt. Trong hát, vấn đề còn phức tạp hơn: melody đã áp đặt một F0 âm nhạc, còn thanh điệu phải tồn tại dưới dạng tương quan cục bộ, hướng chuyển động, duration, voice quality, creaky voice, glottal stop hoặc vị trí nhấn trong phrase.
+
+Do đó, khi thiết kế SVS tiếng Việt, tone label không nên chỉ là một số từ 1 đến 6. Nó cần tối thiểu bốn thuộc tính: loại thanh, hướng F0 tự nhiên, trạng thái phonation, và độ tương thích với note transition. Ta có thể mô tả tone như:
+\[
+T = \langle h, c, q, g \rangle,
+\]
+trong đó $h$ là pitch height tương đối, $c$ là contour, $q$ là voice quality và $g$ là mức glottalization. Trong hát, $h$ có thể bị melody chiếm giữ, nhưng $c$, $q$ và $g$ vẫn có thể bảo toàn nhận diện.
+
+\section{Nền tảng tiếng Nhật: mora, special morae và pitch accent}
+
+\subsection{Mora như đơn vị tổ chức}
+
+Tiếng Nhật được biết đến như một ngôn ngữ có tổ chức mora mạnh. Trong hệ Kana, các đơn vị CV hoặc V thường tương ứng với một ký tự kana, và các đơn vị đặc biệt như moraic nasal /N/, geminate obstruent /Q/ và phần kéo dài nguyên âm có thể chiếm một mora riêng. Thí nghiệm segmentation của \textcite{otake1993mora} cho thấy người nghe Nhật có khuynh hướng phân đoạn lời nói theo mora, trong khi người nghe Pháp và Anh xử lý khác theo nền tảng ngôn ngữ mẹ đẻ.
+
+Về mặt hát, điều này khiến tiếng Nhật có vẻ rất thuận lợi: nhiều ca từ có thể đặt theo nguyên tắc một mora - một nốt. Ví dụ, 
+\jp{さん} /saN/ gồm hai mora; 
+\jp{きって} /kiQte/ gồm ba mora; nguyên âm dài có thể trải qua hai ô thời gian. Đây là cơ sở khiến các hệ tổng hợp hát tiếng Nhật ban đầu vận hành tương đối tự nhiên với bản phổ.
+
+\subsection{Giới hạn của giả thuyết đẳng thời}
+
+Tuy nhiên, 
+\enquote{mora-timed} không đồng nghĩa với mọi mora có duration bằng nhau trong mọi ngữ cảnh. \textcite{port1987mora} cung cấp bằng chứng mạnh cho mora timing trong tiếng Nhật, đặc biệt trong dữ liệu đọc có kiểm soát. Nhưng \textcite{warner2001mora} cho thấy trong lời nói tự phát, số mora dự đoán duration yếu hơn nhiều; số segment và cấu trúc âm tiết cũng có hiệu ứng, và dữ liệu không ủng hộ một cơ chế compensation moraic cứng. Điều này dẫn tới phân biệt quan trọng:
+
+\begin{quote}
+Mora là đơn vị âm vị học và nhận thức nhịp điệu mạnh; nó không nhất thiết là đồng hồ vật lý tuyệt đối.
+\end{quote}
+
+Trong SVS, phân biệt này có hệ quả trực tiếp. Ta có thể dùng mora làm prior để gán note hoặc sub-note, nhưng duration thực tế của từng mora trong hát phải học từ corpus ca sĩ, gồm tempo, note length, phrase boundary, lyrics, genre và expressive timing.
+
+\subsection{Pitch accent trong hát: biến mất hay tái mã hóa?}
+
+Bản nghiên cứu đối lập có xu hướng xem pitch accent tiếng Nhật là yếu tố có thể hy sinh trước melody \parencite{opposingResearch2026}. Điều này đúng một phần: melody có thể che hoặc đảo đường cao độ lexical. Nhưng kết luận 
+\enquote{pitch accent biến mất} là quá mạnh. Trong hát, pitch accent có thể tái mã hóa qua phrasing, vị trí đổi nốt, độ dài mora, mức nhấn âm lượng hoặc lựa chọn lyric setting. Vì vậy, đối với tiếng Nhật, accent tier vẫn nên tồn tại trong annotation, dù acoustic realization của accent không còn là F0 lexical thuần túy.
+
+\section{Timing trong hát: bản phổ, phách và vowel onset}
+
+\subsection{Bản phổ không phải toàn bộ timing}
+
+Trong hệ thống SVS, bản phổ cho ta note onset, note duration, pitch và lyrics. Sinsy được thiết kế để vừa bám pitch/timing của bản phổ, vừa tái tạo các biểu hiện không ghi trên bản phổ như vibrato và timing fluctuations \parencite{hono2021sinsy}. Do đó, ngay trong mô hình kỹ thuật, bản phổ không phải là timing thực tế; nó là lưới mục tiêu.
+
+Gọi note thứ $i$ là $n_i = \langle t_i, d_i, p_i, l_i\rangle$, trong đó $t_i$ là thời điểm bắt đầu, $d_i$ là duration, $p_i$ là pitch, và $l_i$ là lyric. Giọng hát thực tế tạo ra một chuỗi landmark:
+\[
+\voice_i = \langle t^{C}_i, t^{V}_i, t^{R}_i, t^{Coda}_i, t^{off}_i \rangle.
+\]
+Ở đây, $t^C_i$ là onset phụ âm, $t^V_i$ là vowel onset, $t^R_i$ là vùng ổn định vần, $t^{Coda}_i$ là coda closure hoặc nasal onset, và $t^{off}_i$ là offset âm tiết. Một hệ SVS tốt phải học quan hệ:
+\[
+\offset_i = t^{V}_i - t_i,
+\]
+chứ không chỉ ép toàn bộ âm tiết vào $[t_i,t_i+d_i]$.
+
+\subsection{Vowel onset như mốc neo âm nhạc}
+
+Trong hát, phụ âm đầu thường được phát âm sớm hơn để nguyên âm rơi đúng phách. \textcite{sundberg2007sungTone} phân tích thời điểm bắt đầu của tone hát và cho thấy trong thực hành biểu diễn, vowel onset thường là mốc đồng bộ với accompaniment hơn là consonant onset. Điều này giải thích vì sao một bản nhãn SVS chỉ dựa trên phoneme onset có thể nghe 
+\enquote{trễ phách} dù về mặt thời gian tổng quát vẫn đúng bản phổ.
+
+Với tiếng Việt, quan sát này càng quan trọng. Nếu âm đầu đi sớm nhưng vowel onset đúng phách, thanh điệu và vần có không gian bám melody. Nếu âm đầu bị đặt đúng phách, nguyên âm sẽ đến muộn, gây cảm giác lỡ nhịp và làm giảm khả năng nhận diện tone. Với tiếng Nhật, vowel onset cũng quan trọng, nhưng vì nhiều mora có cấu trúc CV đơn giản, mâu thuẫn giữa consonant onset và vowel onset thường ít phức tạp hơn tiếng Việt có cụm vần nặng.
+
+\section{Tone-melody và accent-melody}
+
+\subsection{Tone-melody correspondence trong tiếng Việt}
+
+\textcite{kirby2016toneMelody} nghiên cứu 20 ca khúc phổ thông tiếng Việt và cho thấy text setting chịu ràng buộc theo hướng chuyển động giữa thanh điệu và giai điệu; parallel motion được ưa chuộng, oblique motion được cho phép trong một số trường hợp, còn contrary motion bị hạn chế. Mô hình tốt nhất của họ cho tỉ lệ parallel motion khoảng 77\%. Dữ liệu bổ sung cũng được công bố riêng \parencite{kirby2016dataset}. Đây là bằng chứng quan trọng chống lại hai cực đoan: một mặt không thể nói melody hoàn toàn xóa thanh điệu; mặt khác cũng không thể nói thanh điệu được giữ nguyên như lời nói.
+
+Trong ca hát tiếng Việt, quan hệ tone-melody nên được mô hình hóa theo ba tầng:
+
+\begin{enumerate}
+  \item \textbf{Tầng hướng chuyển động}: thanh lên nên thuận với nốt đi lên hoặc note transition lên; thanh xuống nên thuận với nốt đi xuống hoặc note thấp hơn.
+  \item \textbf{Tầng voice quality}: ngã, nặng, hỏi có thể cần creaky voice, glottalization hoặc độ căng thanh quản.
+  \item \textbf{Tầng duration}: thanh nhập trong vần khép có xu hướng ngắn và căng, nhưng trong hát phải được kéo dài bằng nucleus mà vẫn giữ cue coda.
+\end{enumerate}
+
+\subsection{Accent-melody trong tiếng Nhật}
+
+Tiếng Nhật không có thanh điệu lexical kiểu tiếng Việt, nhưng có pitch accent. Trong hát, pitch accent chịu áp lực từ melody và có thể ít quyết định hơn tone Việt đối với nhận diện từ. Tuy vậy, nếu nghiên cứu nghiêm túc, ta không nên loại bỏ accent khỏi nhãn. Accent có thể đóng vai trò trong perception tự nhiên, phrase grouping và lyric acceptability. Vì vậy, mô hình đề xuất giữ một 
+\tier{accent tier} cho tiếng Nhật, tương tự 
+\tier{tone tier} cho tiếng Việt, nhưng trọng số của nó trong acoustic model nhỏ hơn và phụ thuộc genre.
+
+\section{SVS hiện đại: từ HMM đến Sinsy và NEUTRINO}
+
+\subsection{Từ HMM-based SVS đến DNN-based SVS}
+
+Các hệ HMM-based SVS trước đây mô hình hóa spectrum, excitation và duration đồng thời trong một framework HMM phụ thuộc ngữ cảnh \parencite{saino2006hmm}. Hướng này có ưu điểm controllability cao nhưng hạn chế về chất lượng tự nhiên. DNN-based SVS cải thiện chất lượng nhờ học quan hệ phi tuyến giữa score context và acoustic output \parencite{nishimura2016dnnSVS}. Sinsy là một đại diện trưởng thành của hướng này, với các module time-lag, duration, acoustic và vocoder \parencite{hono2021sinsy}. NEUTRINO, ở cấp sản phẩm, cũng định vị là AI Singing Voice Generator nhận melody và lyrics để ước lượng timing, pitch, voice quality và tổng hợp bằng vocoder \parencite{neutrinoOfficial}.
+
+\subsection{Full-context labels: điểm mạnh và điểm nghẽn}
+
+Full-context labels là cầu nối giữa bản phổ và acoustic model. Chúng mã hóa phoneme identity, context trước-sau, vị trí trong syllable, vị trí trong phrase, note duration, pitch, dynamics, slur, breath và nhiều thuộc tính khác. Mã nguồn Sinsy cho thấy việc tạo nhãn là một lớp kỹ thuật cụ thể, không chỉ là ý tưởng trừu tượng \parencite{sinsyGithub}.
+
+Điểm mạnh của full-context label là controllability. Điểm nghẽn là mỗi ngôn ngữ cần các trường nhãn đúng với ngữ âm của nó. Nếu đưa tiếng Việt vào nhãn thiết kế cho tiếng Nhật mà chỉ thay bảng phoneme, mô hình sẽ bỏ sót ba lớp: tone-bearing rhyme, coda transition và glottalization. Ngược lại, nếu đưa tiếng Nhật vào nhãn syllable-centric mà không có special morae, mô hình sẽ xử lý sai /N/, /Q/ và nguyên âm dài.
+
+\section{So sánh đa chiều tiếng Việt và tiếng Nhật}
+
+\begin{longtable}{L{0.22\textwidth} L{0.35\textwidth} L{0.35\textwidth}}
+\caption{Đối chiếu ngữ âm và định thời Việt--Nhật trong lời nói và hát}\label{tab:comparison}\\
+\toprule
+\textbf{Trục} & \textbf{Tiếng Việt} & \textbf{Tiếng Nhật}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Trục} & \textbf{Tiếng Việt} & \textbf{Tiếng Nhật}\\
+\midrule
+\endhead
+Đơn vị nổi bật & Âm tiết và vần; mỗi âm tiết mang thanh điệu; phần vần là tone-bearing domain. & Mora; CV/V thường một mora; /N/, /Q/ và nguyên âm dài tạo special morae.\\
+\addlinespace
+Quan hệ với bản phổ & Thường một âm tiết ứng với một nốt hoặc một nhóm nốt; melisma phải giữ nhận diện vần và thanh. & Thường một mora ứng với một nốt trong nhiều lyric setting; nhưng không phải luật tuyệt đối.\\
+\addlinespace
+Cue nhận diện quan trọng & F0 tương đối, hướng tone, phonation, glottalization, transition VC, duration vần. & Mora count, vowel length, gemination, nasal mora, pitch accent và phrase grouping.\\
+\addlinespace
+Điểm nghẽn SVS & Vần khép /p t k/ không bật hơi; tone-melody conflict; nguyên âm đôi/ba phi tuyến; thanh ngã/nặng cần glottal cue. & Duration special morae; pitch accent dưới melody; expressive timing khiến mora không đẳng thời tuyệt đối.\\
+\addlinespace
+Mốc timing âm nhạc & Vowel onset của nucleus nên bám beat; consonant onset có thể đi sớm; coda cần cue chuyển tiếp. & Mora onset hoặc vowel onset thường dễ gắn với beat; /Q/ và /N/ cần sub-note timing riêng.\\
+\addlinespace
+Mô hình nhãn cần thêm & Tone tier, rhyme tier, coda-transition tier, phonation tier, word-boundary tier. & Mora tier, special-mora tier, accent tier, phrase-final lengthening tier.\\
+\bottomrule
+\end{longtable}
+
+\section{Phê bình trường phái đối lập}
+
+\subsection{Điểm mạnh}
+
+Bản nghiên cứu đối lập có ba đóng góp rõ. Thứ nhất, nó đặt tiếng Việt và tiếng Nhật vào cùng một pipeline SVS, buộc người đọc thấy rằng khác biệt ngữ âm không chỉ là vấn đề mô tả mà là vấn đề kỹ thuật. Thứ hai, nó nhận ra tiếng Việt cần xử lý riêng ở vần khép, thanh điệu, glottalization và tone-melody congruence \parencite{opposingResearch2026}. Thứ ba, nó dùng Sinsy/NEUTRINO như đối tượng trung gian để chuyển câu hỏi ngữ âm thành câu hỏi về nhãn, duration và acoustic model.
+
+\subsection{Điểm cần chỉnh}
+
+Điểm cần chỉnh thứ nhất là khái niệm 
+\enquote{âm tiết tiếng Việt độc lập tuyệt đối}. Nghiên cứu phụ âm cuối cho thấy ranh giới từ ảnh hưởng đến duration và coarticulation; disyllabic words trong tiếng Việt không phải chỉ là hai âm tiết đặt cạnh nhau \parencite{tran2019vietnameseCoda}. Vì vậy, trong mô hình SVS, word-boundary tier và prosodic-boundary tier là cần thiết.
+
+Điểm cần chỉnh thứ hai là khái niệm 
+\enquote{mora đẳng thời}. Bản đối lập đúng khi lấy \textcite{port1987mora} làm nền, nhưng cần đặt cạnh \textcite{warner2001mora}. Trong lời nói tự phát, mora count không đủ giải thích duration. Trong hát, note duration còn phụ thuộc tempo, phrase, genre và expressive timing. Do đó, mora-to-note nên là prior chứ không phải constraint cứng.
+
+Điểm cần chỉnh thứ ba là cách nhìn về pitch accent Nhật. Nói rằng tiếng Nhật có thể hy sinh pitch accent để theo melody là hợp lý ở mức khái quát, nhưng nếu dùng cho SVS chất lượng cao, ta vẫn cần accent tier. Hệ thống có thể học khi nào accent được trung hòa, khi nào được giữ qua phrasing hoặc note transition.
+
+Điểm cần chỉnh thứ tư là cách xử lý vần tiếng Việt trong nốt dài. Cần tránh giả định rằng nucleus kéo dài gần như toàn bộ nốt còn coda chỉ là token cuối. Đúng là coda closure của /p t k/ thường ngắn, nhưng cue nhận diện coda nằm trong transition trước closure. Nếu transition bị nén quá mạnh, tính rõ lời giảm.
+
+\section{Mô hình đề xuất: nhãn liên tầng cho hát Việt--Nhật}
+
+\subsection{Nguyên tắc tổng quát}
+
+Bài này đề xuất mô hình 
+\term{Multi-Tier Vocal Timing Label} (MTVTL). Mỗi lyric unit được mô tả bằng bảy tầng:
+
+\begin{enumerate}
+  \item \tier{Score tier}: note onset, note duration, pitch, tempo, meter, slur, phrase.
+  \item \tier{Orthography tier}: chữ viết, kana hoặc quốc ngữ, dấu thanh, lyric grouping.
+  \item \tier{Phone tier}: phoneme sequence, quinphone context, onset/nucleus/coda role.
+  \item \tier{Mora/Rhyme tier}: mora cho tiếng Nhật; rhyme-field cho tiếng Việt.
+  \item \tier{Tone/Accent tier}: tone Việt hoặc pitch accent Nhật, kèm hướng contour.
+  \item \tier{Phonation tier}: breathy, creaky, glottal stop, tense/lax.
+  \item \tier{Performance-offset tier}: consonant lead, vowel-onset offset, coda compression, vibrato onset.
+\end{enumerate}
+
+Thay vì ánh xạ trực tiếp lyric unit vào note, mô hình học một hàm:
+\[
+F: \langle \score, L, P, R/M, T/A, Q \rangle \rightarrow \langle \offset_C, \offset_V, d_P, d_R, d_Q, F0_{res}, E \rangle,
+\]
+trong đó $R/M$ là rhyme hoặc mora, $T/A$ là tone hoặc accent, $Q$ là phonation, $F0_{res}$ là phần dư biểu cảm so với pitch bản phổ, và $E$ là excitation/voice-quality parameters.
+
+\subsection{Nhánh tiếng Việt}
+
+Với tiếng Việt, label nên có các trường sau:
+
+\begin{itemize}
+  \item \textbf{Rhyme class}: mở, nửa mở, nửa khép, khép.
+  \item \textbf{Nucleus type}: nguyên âm đơn, đôi, ba; mức ổn định formant.
+  \item \textbf{Coda type}: zero, glide, nasal, unreleased stop.
+  \item \textbf{Tone type}: ngang, sắc, huyền, hỏi, ngã, nặng; có thể mã hóa theo dialect.
+  \item \textbf{Glottal flag}: none, creaky, glottal stop, severe constriction.
+  \item \textbf{Boundary}: intraword, interword, phrase-final.
+  \item \textbf{Tone-melody relation}: parallel, oblique, contrary.
+\end{itemize}
+
+Đối với vần khép, duration model không nên tối ưu theo từng phoneme độc lập. Nó nên tối ưu theo contour chuyển tiếp:
+\[
+R(t) = \{F_1(t), F_2(t), F_3(t), I(t), F0(t)\}_{t \in [0.5d_V,0.9d_V]},
+\]
+vì chính vùng này chứa cue coda trong nhiều trường hợp \parencite{tran2019vietnameseCoda}. Với thanh ngã và nặng, phonation tier phải can thiệp vào excitation, không chỉ cộng một contour F0.
+
+\subsection{Nhánh tiếng Nhật}
+
+Với tiếng Nhật, label nên có các trường:
+
+\begin{itemize}
+  \item \textbf{Mora index}: vị trí mora trong word, phrase và note group.
+  \item \textbf{Special mora class}: ordinary, /N/, /Q/, long-vowel tail.
+  \item \textbf{Accent pattern}: unaccented, initial-drop, medial-drop, final-drop.
+  \item \textbf{Mora-to-note relation}: one-to-one, many-to-one, one-to-many, slurred.
+  \item \textbf{Geminate closure allocation}: duration phần im lặng/closure trước onset sau.
+  \item \textbf{Phrase-final lengthening}: mức kéo dài cuối phrase.
+\end{itemize}
+
+Cách này giữ ưu điểm của mora nhưng tránh biến mora thành hằng số thời lượng. Mô hình học duration từ dữ liệu hát, nhưng có prior rằng special morae không được nuốt mất, vì chúng có chức năng phân biệt từ.
+
+\section{Thiết kế corpus và thí nghiệm kiểm định}
+
+\subsection{Corpus tối thiểu}
+
+Một corpus kiểm định nên gồm bốn lớp dữ liệu cho mỗi ngôn ngữ:
+
+\begin{enumerate}
+  \item \textbf{Speech}: đọc tự nhiên câu lyric.
+  \item \textbf{Chanted speech}: đọc theo phách đều, không melody phức tạp.
+  \item \textbf{One-note-per-unit singing}: hát mỗi âm tiết/mora trên một nốt.
+  \item \textbf{Melismatic singing}: hát có luyến, nhiều nốt cho một đơn vị.
+\end{enumerate}
+
+Với tiếng Việt, vật liệu phải cân bằng theo 6 thanh, 4 loại vần, coda /p t k m n ŋ w j/, nguyên âm đơn/đôi và boundary. Với tiếng Nhật, vật liệu phải cân bằng theo mora thường, /N/, /Q/, nguyên âm dài, accent patterns và phrase position.
+
+\subsection{Annotation tiers}
+
+Mỗi file âm thanh nên được gán TextGrid gồm các tiers:
+
+\begin{enumerate}
+  \item note onset/off theo bản phổ;
+  \item consonant onset;
+  \item vowel onset;
+  \item nucleus steady-state;
+  \item coda transition;
+  \item coda closure hoặc nasal murmur;
+  \item mora boundary;
+  \item tone/accent target;
+  \item glottalization/phonation;
+  \item breath và vibrato onset.
+\end{enumerate}
+
+Những tiers này cho phép kiểm tra trực tiếp câu hỏi: trong hát, người nghe và ca sĩ bám vào âm tiết, mora, vowel onset, hay note onset?
+
+\subsection{Ba thí nghiệm cốt lõi}
+
+\subsubsection{Thí nghiệm 1: speech-song continuum}
+
+Cùng một lyric được đọc, đọc theo phách, hát đơn giản và hát luyến. Ta đo độ dịch chuyển của vowel onset so với beat, tỉ lệ duration giữa onset-nucleus-coda, và mức biến dạng tone/accent. Giả thuyết là tiếng Việt giữ trường vần và phonation tốt hơn khi chuyển sang hát, còn tiếng Nhật giữ mora count và special morae tốt hơn.
+
+\subsubsection{Thí nghiệm 2: perception dưới xung đột melody}
+
+Tạo stimuli trong đó melody thuận, trung tính hoặc nghịch với tone Việt và accent Nhật. Với tiếng Việt, dự đoán contrary motion làm giảm nhận diện từ, nhất là với thanh sắc, hỏi, ngã, nặng. Với tiếng Nhật, xung đột accent-melody có thể giảm độ tự nhiên nhiều hơn giảm nhận diện từ.
+
+\subsubsection{Thí nghiệm 3: SVS ablation}
+
+Huấn luyện hoặc mô phỏng bốn hệ:
+
+\begin{enumerate}
+  \item baseline: phoneme + note labels;
+  \item thêm mora/rhyme tier;
+  \item thêm tone/accent tier;
+  \item thêm phonation + performance-offset tier.
+\end{enumerate}
+
+Đánh giá bằng MOS tự nhiên, intelligibility, tone/accent perception và alignment error. Nếu mô hình đề xuất đúng, hệ tiếng Việt sẽ cải thiện mạnh khi thêm rhyme-transition và phonation tier; hệ tiếng Nhật sẽ cải thiện mạnh khi thêm special-mora và accent tiers.
+
+\section{Hàm loss đề xuất cho SVS Việt--Nhật}
+
+Một acoustic model tiêu chuẩn thường tối ưu loss phổ âm, F0 và duration. Với hai ngôn ngữ này, nên thêm các loss có cấu trúc:
+
+\[
+\mathcal{L} = \lambda_1\mathcal{L}_{mel} + \lambda_2\mathcal{L}_{F0} + \lambda_3\mathcal{L}_{dur} + \lambda_4\mathcal{L}_{align} + \lambda_5\mathcal{L}_{cue} + \lambda_6\mathcal{L}_{phon}.
+\]
+
+Trong đó $\mathcal{L}_{cue}$ đo cue nhận diện coda/mora, còn $\mathcal{L}_{phon}$ đo trạng thái phonation. Với tiếng Việt, $\mathcal{L}_{cue}$ tập trung vào formant/intensity transitions ở vần khép; với tiếng Nhật, nó tập trung vào preservation của /N/, /Q/ và long-vowel tail. $\mathcal{L}_{align}$ nên đo vowel-onset error thay vì chỉ phone-boundary error.
+
+Với tone-melody, có thể thêm penalty cho contrary motion:
+\[
+\mathcal{L}_{tm} = \sum_i \mathbf{1}\{m_i = \text{contrary}\}\cdot w(T_i, genre, position),
+\]
+trong đó $m_i$ là quan hệ giữa hướng tone và hướng melody, còn $w$ phụ thuộc loại thanh, thể loại và vị trí phrase. Đây không phải luật cấm tuyệt đối; nó là ràng buộc xác suất.
+
+\section{Bàn luận: từ đối lập sang hợp nhất}
+
+Hai trường phái ban đầu dường như đối lập. Trường phái kỹ thuật muốn một pipeline rõ: MusicXML vào, labels ra, model dự đoán duration/F0/spectrum. Trường phái ngữ âm thực nghiệm muốn đo từng cue nhỏ và cảnh giác với khái niệm quá sạch. Bài này cho rằng cả hai đều cần nhau. Không có pipeline kỹ thuật, phân tích ngữ âm khó biến thành hệ thống hát máy. Không có dữ liệu ngữ âm, pipeline kỹ thuật dễ học sai hoặc bỏ qua cue quan trọng.
+
+Với tiếng Việt, đóng góp lớn nhất của hướng lai là chuyển trọng tâm từ 
+\enquote{âm tiết} sang 
+\enquote{trường vần có thanh điệu}. Điều này cho phép duration model xử lý nguyên âm đôi, coda không bật hơi và glottalization cùng lúc. Với tiếng Nhật, đóng góp lớn nhất là chuyển từ 
+\enquote{mora bằng nhau} sang 
+\enquote{mora là prior tổ chức, duration học từ dữ liệu}. Điều này giữ được sức mạnh của mora mà vẫn tương thích với dữ liệu spontaneous speech và expressive singing.
+
+\section{Hạn chế}
+
+Bản thảo này có ba hạn chế. Thứ nhất, nó là tổng hợp lý thuyết và đề xuất mô hình, chưa có corpus mới. Thứ hai, các dẫn chiếu về NEUTRINO chủ yếu dựa vào nguồn chính thức cấp sản phẩm, không phải bài báo peer-reviewed chi tiết như Sinsy. Thứ ba, vai trò của ChatGPT/Gemini trong quá trình tổng thuật giúp mở rộng phạm vi và phản biện giả định, nhưng cũng có nguy cơ tạo ra các phân loại quá gọn. Vì vậy, mọi mô hình trong bài cần được xem là giả thuyết kiểm định, không phải kết luận cuối.
+
+\section{Kết luận}
+
+Tiếng Việt và tiếng Nhật không chỉ khác nhau ở 
+\enquote{âm tiết} và 
+\enquote{mora}. Chúng khác nhau ở cách mỗi ngôn ngữ phân bổ thông tin nhận diện vào thời gian. Tiếng Nhật phân bổ thông tin nhịp vào mora và special morae; tiếng Việt phân bổ thông tin vào vần, tone, transition và phonation. Khi hát, bản phổ tạo ra một lưới thời gian chung, nhưng mỗi ngôn ngữ thương lượng với lưới đó theo cách riêng.
+
+Bài nghiên cứu đối lập đúng khi nhấn mạnh sự thuận lợi tương đối của mora Nhật và độ phức tạp của vần-thanh tiếng Việt. Nhưng để thành bài báo khoa học mạnh, cần viết lại các phát biểu tuyệt đối thành mô hình xác suất, đo được và kiểm định được. Mô hình MTVTL được đề xuất ở đây nhằm làm điều đó: giữ full-context labels của SVS hiện đại, nhưng bổ sung tầng rhyme, mora, tone/accent, phonation và performance offset. Với mô hình này, ChatGPT, Gemini et al. không phải là người phán quyết khoa học; chúng là công cụ tạo giả thuyết và bản đồ hóa tranh luận. Dữ liệu âm thanh, annotation và thí nghiệm perception mới là nơi quyết định mô hình nào đúng.
+
+\appendix
+\section{Phụ lục A: Mẫu nhãn gợi ý}
+
+\subsection{Mẫu nhãn tiếng Việt}
+
+\begin{Verbatim}[breaklines=true,fontsize=\small]
+score: note_id=17; onset=12.500; dur=0.750; pitch=A4; tempo=92
+orth: lyric="khát"; tone=sac; syllable=CVC; rhyme=closed
+phone: k_h a t; onset=k_h; nucleus=a; coda=t; next_phone=s
+rhyme: nucleus_type=single; coda_class=unreleased_stop; transition=required
+tone: category=rising; checked=yes; melody_relation=parallel
+phonation: glottal=none; tense=high
+performance: consonant_lead=-0.055; vowel_offset=+0.002; coda_dur=0.048
+\end{Verbatim}
+
+\subsection{Mẫu nhãn tiếng Nhật}
+
+\begin{Verbatim}[breaklines=true,fontsize=\small]
+score: note_id=22; onset=15.000; dur=0.500; pitch=E4; tempo=110
+orth: lyric="さん"; kana=サン
+mora: mora_seq=sa+N; current_mora=N; special_mora=nasal
+phone: s a N; nucleus=a; coda=N
+accent: pattern=unaccented; phrase_position=medial
+performance: vowel_offset=+0.000; mora_boundary=15.250; N_dur=0.250
+\end{Verbatim}
+
+\section{Phụ lục B: Checklist kiểm chứng nguồn trong nghiên cứu do AI hỗ trợ}
+
+\begin{enumerate}
+  \item Mỗi khẳng định kỹ thuật phải có nguồn học thuật hoặc mã nguồn kiểm chứng.
+  \item Nguồn AI-generated chỉ dùng như tư liệu đối chiếu, không dùng làm bằng chứng độc lập.
+  \item Cần phân biệt nguồn peer-reviewed, nguồn preprint, nguồn tài liệu sản phẩm và nguồn cộng đồng.
+  \item Các khái niệm như 
+  \enquote{đẳng thời}, 
+  \enquote{độc lập âm tiết}, 
+  \enquote{hy sinh pitch accent} phải được viết dưới dạng giả thuyết có điều kiện.
+  \item Mọi mô hình đề xuất cần dẫn tới annotation protocol hoặc thí nghiệm perception cụ thể.
+\end{enumerate}
+
+\newpage
+\printbibliography
+
+\end{document}
