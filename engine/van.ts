@@ -72,9 +72,19 @@ export function codaToPhonemes(
   tone: number = 0,
   mode: "transparent" | "voicevox" = "transparent",
 ): string[] {
-  const phonemes: string[] = [];
+  const phonemes =
+    mode === "voicevox" ? voicevoxCodaToPhonemes(coda) : transparentCodaToPhonemes(coda);
+  const hasStopCoda = ["p", "t", "c", "ch"].includes(coda);
 
-  // Hand-baked preference: Always use literal phonemes for readiness
+  if ((tone === 4 || tone === 5) && !hasStopCoda && !phonemes.includes("cl")) {
+    phonemes.push("cl");
+  }
+
+  return phonemes;
+}
+
+function transparentCodaToPhonemes(coda: string): string[] {
+  const phonemes: string[] = [];
   if (coda === "m") phonemes.push("m");
   else if (coda === "n") phonemes.push("n");
   else if (coda === "ng") phonemes.push("n", "g");
@@ -82,16 +92,19 @@ export function codaToPhonemes(
   else if (coda === "p") phonemes.push("p");
   else if (coda === "t") phonemes.push("t");
   else if (coda === "c") phonemes.push("k");
-  else if (coda === "ch") phonemes.push("k"); // ch coda -> k
+  else if (coda === "ch")
+    phonemes.push("k"); // ch coda -> k
   else if (["i", "y"].includes(coda)) phonemes.push("i");
   else if (coda === "u") phonemes.push("u");
   else if (coda === "o") phonemes.push("o");
-
-  // Tonal glottalization for Ngã (4) and Nặng (5)
-  // Usually added after the vowel/nasal or as part of the coda
-  if ((tone === 4 || tone === 5) && !phonemes.includes("cl")) {
-    phonemes.push("cl");
-  }
-
   return phonemes;
+}
+
+function voicevoxCodaToPhonemes(coda: string): string[] {
+  if (["m", "n", "ng", "nh"].includes(coda)) return ["N"];
+  if (["p", "t", "c", "ch"].includes(coda)) return ["cl"];
+  if (["i", "y"].includes(coda)) return ["i"];
+  if (coda === "u") return ["u"];
+  if (coda === "o") return ["o"];
+  return [];
 }

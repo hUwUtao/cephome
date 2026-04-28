@@ -139,9 +139,10 @@ export class DomMusicXmlParser implements MusicXmlParser {
   ): ScoreNote {
     const lyricEl = first(note, "lyric");
     const lyricRaw = textOf(first(lyricEl, "text"));
-    const lyricText = (canonicalizeVietnamese(lyricRaw ?? "") || null)?.replace(/[.,!?;:]/g, "") ?? null;
+    const lyricText =
+      (canonicalizeVietnamese(lyricRaw ?? "") || null)?.replace(/[.,!?;:]/g, "") ?? null;
     const hasExtend = first(lyricEl, "extend") !== null;
-    
+
     return {
       id: meta.id,
       partId: meta.partId,

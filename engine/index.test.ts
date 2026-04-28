@@ -15,7 +15,7 @@ test("research: dương", () => {
 });
 
 test("research: vãng", () => {
-  expect(transcribeSyllable("vãng")).toBe("v,a,n,g");
+  expect(transcribeSyllable("vãng")).toBe("v,a,n,g,cl");
 });
 
 test("research: dinh", () => {
@@ -137,7 +137,7 @@ test("transcribeSyllable: error-tolerant (invalid input returns empty)", () => {
 
 // VOICEVOX mode tests — nasal/stop codas converted to N/cl, digraph onsets simplified
 test("voicevox: vãng (nasal ng → N)", () => {
-  expect(transcribeSyllable("vãng", "voicevox")).toBe("v,a,N");
+  expect(transcribeSyllable("vãng", "voicevox")).toBe("v,a,N,cl");
 });
 
 test("voicevox: kiên (nasal n → N)", () => {
@@ -157,7 +157,12 @@ test("voicevox: nhà (nh → ny onset)", () => {
 });
 
 test("voicevox: ngã (ng → n,g onset)", () => {
-  expect(transcribeSyllable("ngã", "voicevox")).toBe("n,g,a");
+  expect(transcribeSyllable("ngã", "voicevox")).toBe("n,g,a,cl");
+});
+
+test("transparent mode preserves ngã/nặng tone closure", () => {
+  expect(transcribeSyllable("dạ")).toBe("z,a,cl");
+  expect(transcribeSyllable("ngã")).toBe("n,g,a,cl");
 });
 
 // New tests for derived rules

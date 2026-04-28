@@ -64,8 +64,8 @@ export class VocalLineNormalizer implements ScoreNormalizer {
         // If we had a pending word but it didn't end properly, just flush it
         // (This handles poorly formatted XML)
         if (firstNoteInWord && out.length > 0) {
-           const idx = out.findIndex(n => n.id === firstNoteInWord?.id);
-           if (idx !== -1) out[idx]!.lyric = pendingLyric;
+          const idx = out.findIndex((n) => n.id === firstNoteInWord?.id);
+          if (idx !== -1) out[idx]!.lyric = pendingLyric;
         }
         pendingLyric = "";
         firstNoteInWord = null;
@@ -176,10 +176,10 @@ export class VocalLineNormalizer implements ScoreNormalizer {
       // This handles melisma (..) and unmarked slurs in MusicXML
       if (previous && !note.lyric && !note.isRest && previous.pitch) {
         carryInfo = carryInfo ?? carryVowelInfo(previous);
-        out.push({ 
-          ...note, 
-          carriedPhones: carryInfo.phones, 
-          carriedTone: carryInfo.tone 
+        out.push({
+          ...note,
+          carriedPhones: carryInfo.phones,
+          carriedTone: carryInfo.tone,
         });
         continue;
       }
@@ -203,7 +203,7 @@ function shouldMergeTie(previous: ScoreNote, note: ScoreNote): boolean {
 function carryVowelInfo(note: ScoreNote): { phones: string[]; tone: number } {
   const tone = extractTone(note.lyric ?? "");
   if (!note.lyric) return { phones: ["a"], tone: 0 };
-  
+
   const canonical = canonicalizeVietnamese(note.lyric);
   const chars = Array.from(
     canonical
@@ -214,7 +214,7 @@ function carryVowelInfo(note: ScoreNote): { phones: string[]; tone: number } {
   const lastVowel = [...chars]
     .reverse()
     .find((char) => "aeiouăâêôơưy".includes(char.toLowerCase()));
-  
+
   let phones = ["a"];
   if (lastVowel) {
     const lv = lastVowel.toLowerCase();
@@ -223,6 +223,6 @@ function carryVowelInfo(note: ScoreNote): { phones: string[]; tone: number } {
     else if ("oôơ".includes(lv)) phones = ["o"];
     else if ("uư".includes(lv)) phones = ["u"];
   }
-  
+
   return { phones, tone };
 }

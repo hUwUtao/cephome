@@ -203,9 +203,15 @@ test("cumulative timing keeps whole-note phoneme windows", () => {
   );
   const mono = new MonoLabelEmitter().emit(events);
   expect(mono).toBe(
-    ["0 6000000 k", "0 6000000 i", "0 6000000 e", "0 6000000 N", "6000000 12000000 pau", ""].join(
-      "\n",
-    ),
+    [
+      "0 0 pau",
+      "0 6000000 k",
+      "0 6000000 i",
+      "0 6000000 e",
+      "0 6000000 N",
+      "6000000 12000000 pau",
+      "",
+    ].join("\n"),
   );
 });
 
@@ -218,6 +224,7 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   const mono = new MonoLabelEmitter().emit(events);
   expect(mono).toBe(
     [
+      "0 0 pau",
       "0 400000 k",
       "400000 4800000 i",
       "4800000 5360000 e",
@@ -264,6 +271,7 @@ test("MusicXML dynamics and articulation feed expression gauges", () => {
 
 test("pipeline emits mono and full labels", () => {
   const result = new SinsyLabelPipeline().serialize(SIMPLE_XML);
+  expect(result.mono.startsWith("0 0 pau\n")).toBe(true);
   expect(result.mono).toContain("0 400000 k");
   expect(result.full).toContain("/E:C4]60^0=2/4~100");
   expect(result.full).toContain("/F:xx#xx#xx-xx$xx$xx+xx%xx;");

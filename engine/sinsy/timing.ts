@@ -31,7 +31,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
 
       const phones = phonesForNote(note, lyricTranspiler);
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
-      const tone = note.carriedTone ?? (transpiled?.tone ?? 0);
+      const tone = note.carriedTone ?? transpiled?.tone ?? 0;
       const vowelSign = transpiled?.vowelSign ?? 0;
       phones.forEach((phoneme, index) => {
         events.push({
@@ -102,7 +102,7 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
 
       const planResult = planForNote(note, lyricTranspiler);
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
-      const tone = note.carriedTone ?? (transpiled?.tone ?? 0);
+      const tone = note.carriedTone ?? transpiled?.tone ?? 0;
       const vowelSign = transpiled?.vowelSign ?? 0;
       const windows = assignPhoneWindows(planResult, start, end, this.options);
       windows.forEach((window, index) => {
@@ -243,20 +243,25 @@ function applyBoundaryPrefire(
 
     const previousLast = previous[previous.length - 1]!;
     const previousLastDuration = previousLast.end - previousLast.start;
-    // Protect at least 40% of the last phoneme or 20ms, whichever is smaller
     const protection = Math.min(previousLastDuration * 0.4, 200_000);
-    const safePrefire = Math.min(prefire, Math.max(0, previousLastDuration - protection));
+    const safePrefire = Math.floor(
+      Math.min(prefire, Math.max(0, previousLastDuration - protection)),
+    );
 
     const newPreviousEnd = Math.max(previousLast.start + 1, boundary - safePrefire);
     previousLast.end = Math.min(previousLast.end, newPreviousEnd);
 
     for (const event of current) {
-      event.start = Math.max(previousLast.end, event.start - safePrefire);
-      event.end = Math.max(event.start + 1, event.end - safePrefire);
+      event.start = Math.floor(Math.max(previousLast.end, event.start - safePrefire));
+      event.end = Math.floor(Math.max(event.start + 1, event.end - safePrefire));
     }
   }
 
-  return events;
+  return events.map((event) => ({
+    ...event,
+    start: Math.floor(event.start),
+    end: Math.floor(event.end),
+  }));
 }
 
 function groupByNote(events: PhoneEvent[]): PhoneEvent[][] {

@@ -1,9 +1,6 @@
 import { expect, test } from "bun:test";
-import {
-  SinsyLabelPipeline,
-  VietnameseMoraPlanTranspiler,
-  expressionForNote,
-} from "./index.ts";
+import { SinsyLabelPipeline, VietnameseMoraPlanTranspiler, expressionForNote } from "./index.ts";
+import type { ScoreNote } from "./types.ts";
 
 const TONAL_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="4.0">
@@ -45,7 +42,7 @@ const TONAL_XML = `<?xml version="1.0" encoding="UTF-8"?>
 
 test("Vietnamese tonal aware phonemes (cl for tones 4 and 5)", () => {
   const transpiler = new VietnameseMoraPlanTranspiler("voicevox");
-  
+
   // 'dạ' is tone 5 (nặng) -> should have 'cl' at the end
   const da = transpiler.plan("dạ");
   expect(da.tone).toBe(5);
@@ -63,13 +60,34 @@ test("Vietnamese tonal aware phonemes (cl for tones 4 and 5)", () => {
 });
 
 test("Tonal pitch microtoning calculation", () => {
-  // Mock note
-  const note: any = {
-    pitch: { midi: 60, name: "C4" },
+  const note: ScoreNote = {
+    id: "P1:1:0",
+    partId: "P1",
+    measureNumber: "1",
+    voice: "1",
+    staff: "1",
+    startDiv: 0,
+    endDiv: 2,
+    pitch: { step: "C", alter: 0, octave: 4, midi: 60, name: "C4" },
     durationDiv: 2,
     divisions: 2,
     tempo: 120,
-    dynamic: "mf"
+    beat: { beats: 4, beatType: 4 },
+    isRest: false,
+    isChord: false,
+    isGrace: false,
+    isCue: false,
+    isPrintable: true,
+    lyric: "má",
+    carriedPhones: null,
+    carriedTone: null,
+    syllabic: "single",
+    tie: null,
+    slur: null,
+    hasBreath: false,
+    dynamic: "mf",
+    hasAccent: false,
+    hasStaccato: false,
   };
 
   // Tone 2 (Sắc) -> High rising
@@ -98,27 +116,27 @@ test("Sinsy labels contain Vietnamese tone information", () => {
   // 'z' (pos 0), 'a' (pos 1), 'cl' (pos 2)
   // tone 5 offset for pos 2 of 3 is -0.7 * (2/2) = -0.7.
   // midi 60 - 0.7 = 59.3 -> rounded to 59.
-  expect(result.full).toContain("]59^"); 
+  expect(result.full).toContain("]59^");
 });
 
 test("Vowel signature and short-vowel timing", () => {
   const transpiler = new VietnameseMoraPlanTranspiler();
-  
+
   // 'phân' uses 'â' (signature 3, short)
   const phan = transpiler.plan("phân");
   expect(phan.vowelSign).toBe(3);
-  const vowelA = phan.plan.find(p => p.phone === "a");
+  const vowelA = phan.plan.find((p) => p.phone === "a");
   expect(vowelA?.weight).toBe(0.5);
 
   // 'phê' uses 'ê' (signature 5, modal)
   const phe = transpiler.plan("phê");
   expect(phe.vowelSign).toBe(5);
-  const vowelE = phe.plan.find(p => p.phone === "e");
+  const vowelE = phe.plan.find((p) => p.phone === "e");
   expect(vowelE?.weight).toBe(1.0);
 
   // 'trăng' uses 'ă' (signature 2, short)
   const trang = transpiler.plan("trăng");
   expect(trang.vowelSign).toBe(2);
-  const vowelAW = trang.plan.find(p => p.phone === "a");
+  const vowelAW = trang.plan.find((p) => p.phone === "a");
   expect(vowelAW?.weight).toBe(0.5);
 });

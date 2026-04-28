@@ -16,7 +16,7 @@ export class VietnameseSinsyLyricTranspiler implements LyricTranspiler {
     ];
 
     const tone = extractTone(lyric);
-    
+
     // Simple heuristic for vowel sign in non-plan mode
     const nucleusMatch = lyric.normalize("NFD").match(/[aăâeêoôơuyưi]+/);
     const nucleus = nucleusMatch ? nucleusMatch[0].normalize("NFC") : "";
@@ -33,8 +33,28 @@ export class VietnameseSinsyLyricTranspiler implements LyricTranspiler {
 }
 
 const VOWEL_SIGNATURES_STATIC: Record<string, number> = {
-  a: 1, ă: 2, â: 3, e: 4, ê: 5, o: 6, ô: 7, ơ: 8, i: 9, y: 9, u: 10, ư: 11,
-  iê: 12, ia: 12, uô: 13, ua: 13, ươ: 14, ưa: 14, oa: 15, oe: 15, yê: 12, uyê: 16
+  a: 1,
+  ă: 2,
+  â: 3,
+  e: 4,
+  ê: 5,
+  o: 6,
+  ô: 7,
+  ơ: 8,
+  i: 9,
+  y: 9,
+  u: 10,
+  ư: 11,
+  iê: 12,
+  ia: 12,
+  uô: 13,
+  ua: 13,
+  ươ: 14,
+  ưa: 14,
+  oa: 15,
+  oe: 15,
+  yê: 12,
+  uyê: 16,
 };
 
 export class LiteralPhoneLyricTranspiler implements LyricTranspiler {

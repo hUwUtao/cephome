@@ -76,7 +76,11 @@ const J_SEP = ["/J:", "~", "@"];
 
 export class MonoLabelEmitter implements LabelEmitter {
   emit(events: PhoneEvent[]): string {
-    return events.map((event) => `${event.start} ${event.end} ${event.phoneme}`).join("\n") + "\n";
+    return (
+      ["0 0 pau", ...events.map((event) => `${event.start} ${event.end} ${event.phoneme}`)].join(
+        "\n",
+      ) + "\n"
+    );
   }
 }
 

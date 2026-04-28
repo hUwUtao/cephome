@@ -9,7 +9,7 @@ const ONSET_MAP: Record<string, string[]> = {
   nh: ["ny"],
   ch: ["ch"],
   tr: ["ty", "z"], // Hand-baked 'bite' from thuyenla.ccs
-  th: ["t", "h"], // Hand-baked aspiration
+  th: ["ty"],
   ph: ["f"],
   kh: ["k"], // 'k' has more bite than 'h'
   gi: ["z"],
