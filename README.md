@@ -1,21 +1,14 @@
-# bun-react-template
+# a mora to vietnamese tokenizer
 
-To install dependencies:
+interop with anything that speaks mora syntax
 
-```bash
-bun install
-```
+## cevio
 
-To start a development server:
+cevio is not playwright, but you get the ok ish finetuned translator from [the web](https://huwutao.github.io/cephome)
 
-```bash
-bun dev
-```
+## neutrino (tau)
 
-To run for production:
+- download `musicXMLtoLabel.exe`, put it in `NEUTRINO/bin` (you only have to do this once)
+- download `rule.js`, put it in `NEUTRINO`
 
-```bash
-bun start
-```
-
-This project was created using `bun init` in bun v1.3.10. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+run conversion as normal. only pure vietnamese lyrics is yet supported.
