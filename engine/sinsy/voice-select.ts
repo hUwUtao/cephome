@@ -1,3 +1,4 @@
+import { canonicalizeVietnamese, extractTone } from "../normalize.ts";
 import type { ScoreDocument, ScoreNormalizer, ScoreNote } from "./types.ts";
 
 export interface VocalLineNormalizerOptions {
@@ -22,15 +23,57 @@ export class VocalLineNormalizer implements ScoreNormalizer {
   normalize(score: ScoreDocument): ScoreDocument {
     const selected = this.selectVocalVoice(score.notes);
     const printable = selected
-      .filter((note) => note.isPrintable && !note.isCue && !note.isGrace)
+      .filter((note) => note.isPrintable && !note.isCue) // Keep grace notes
       .sort((a, b) => a.startDiv - b.startDiv || a.id.localeCompare(b.id));
     const withoutChordClutter = this.chooseChordRepresentatives(printable);
-    const withTies = this.mergeTies(withoutChordClutter);
+    const joinedSyllables = this.joinSyllabicLyric(withoutChordClutter);
+    const withTies = this.mergeTies(joinedSyllables);
     const withSlurCarry = this.markSlurContinuations(withTies);
     return {
       ...score,
       notes: withSlurCarry,
     };
+  }
+
+  private joinSyllabicLyric(notes: ScoreNote[]): ScoreNote[] {
+    const out: ScoreNote[] = [];
+    let pendingLyric = "";
+    let firstNoteInWord: ScoreNote | null = null;
+
+    for (const note of notes) {
+      if (note.lyric && (note.syllabic === "begin" || note.syllabic === "middle")) {
+        pendingLyric += note.lyric;
+        firstNoteInWord = firstNoteInWord ?? note;
+        // This note contributes to a word, but we'll emit the full word on the 'end' note
+        // or just keep it as is if it's not Vietnamese.
+        // Actually, for Vietnamese, joining "ba" + "-" + "o" -> "bao" is good.
+        out.push({ ...note, lyric: null });
+        continue;
+      }
+
+      if (note.lyric && note.syllabic === "end") {
+        const fullLyric = pendingLyric + note.lyric;
+        out.push({ ...note, lyric: fullLyric });
+        pendingLyric = "";
+        firstNoteInWord = null;
+        continue;
+      }
+
+      // Reset if we hit a rest or a single syllable
+      if (pendingLyric && (note.isRest || note.syllabic === "single" || !note.lyric)) {
+        // If we had a pending word but it didn't end properly, just flush it
+        // (This handles poorly formatted XML)
+        if (firstNoteInWord && out.length > 0) {
+           const idx = out.findIndex(n => n.id === firstNoteInWord?.id);
+           if (idx !== -1) out[idx]!.lyric = pendingLyric;
+        }
+        pendingLyric = "";
+        firstNoteInWord = null;
+      }
+
+      out.push(note);
+    }
+    return out;
   }
 
   private selectVocalVoice(notes: ScoreNote[]): ScoreNote[] {
@@ -118,24 +161,26 @@ export class VocalLineNormalizer implements ScoreNormalizer {
 
   private markSlurContinuations(notes: ScoreNote[]): ScoreNote[] {
     const out: ScoreNote[] = [];
-    let carryPhones: string[] | null = null;
+    let carryInfo: { phones: string[]; tone: number } | null = null;
 
     for (const note of notes) {
+      // If note has explicit lyric or is a rest, reset carry info
       if (note.lyric || note.isRest) {
-        carryPhones = null;
+        carryInfo = null;
         out.push(note);
         continue;
       }
 
       const previous = out[out.length - 1];
-      if (
-        previous &&
-        !note.lyric &&
-        !note.isRest &&
-        (previous.slur === "start" || note.slur === "stop" || previous.tie === "start")
-      ) {
-        carryPhones = carryPhones ?? carryVowelPhones(previous);
-        out.push({ ...note, carriedPhones: carryPhones });
+      // Be more aggressive: if it's a pitched note without lyric, try to carry
+      // This handles melisma (..) and unmarked slurs in MusicXML
+      if (previous && !note.lyric && !note.isRest && previous.pitch) {
+        carryInfo = carryInfo ?? carryVowelInfo(previous);
+        out.push({ 
+          ...note, 
+          carriedPhones: carryInfo.phones, 
+          carriedTone: carryInfo.tone 
+        });
         continue;
       }
 
@@ -155,10 +200,13 @@ function shouldMergeTie(previous: ScoreNote, note: ScoreNote): boolean {
   return true;
 }
 
-function carryVowelPhones(note: ScoreNote): string[] {
-  if (!note.lyric) return ["a"];
+function carryVowelInfo(note: ScoreNote): { phones: string[]; tone: number } {
+  const tone = extractTone(note.lyric ?? "");
+  if (!note.lyric) return { phones: ["a"], tone: 0 };
+  
+  const canonical = canonicalizeVietnamese(note.lyric);
   const chars = Array.from(
-    note.lyric
+    canonical
       .normalize("NFD")
       .replace(/[\u0300\u0301\u0303\u0309\u0323]/g, "")
       .normalize("NFC"),
@@ -166,10 +214,15 @@ function carryVowelPhones(note: ScoreNote): string[] {
   const lastVowel = [...chars]
     .reverse()
     .find((char) => "aeiouăâêôơưy".includes(char.toLowerCase()));
-  if (!lastVowel) return ["a"];
-  if ("iíìỉĩịyýỳỷỹỵ".includes(lastVowel)) return ["i"];
-  if ("eê".includes(lastVowel)) return ["e"];
-  if ("oôơ".includes(lastVowel)) return ["o"];
-  if ("uư".includes(lastVowel)) return ["u"];
-  return ["a"];
+  
+  let phones = ["a"];
+  if (lastVowel) {
+    const lv = lastVowel.toLowerCase();
+    if ("iíìỉĩịyýỳỷỹỵ".includes(lv)) phones = ["i"];
+    else if ("eê".includes(lv)) phones = ["e"];
+    else if ("oôơ".includes(lv)) phones = ["o"];
+    else if ("uư".includes(lv)) phones = ["u"];
+  }
+  
+  return { phones, tone };
 }

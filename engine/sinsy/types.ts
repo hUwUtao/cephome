@@ -33,6 +33,7 @@ export interface ScoreNote {
   isPrintable: boolean;
   lyric: string | null;
   carriedPhones: string[] | null;
+  carriedTone: number | null;
   syllabic: "single" | "begin" | "middle" | "end" | null;
   pitch: ScorePitch | null;
   tie: "start" | "stop" | "continue" | null;
@@ -52,6 +53,8 @@ export interface ScoreDocument {
 export interface LyricTranspilation {
   source: string;
   phones: string[];
+  tone: number;
+  vowelSign: number;
   warnings: string[];
 }
 
@@ -59,6 +62,7 @@ export interface TimedPhonePlan {
   phone: string;
   role: PhoneRole;
   weight: number;
+  vowelSign?: number;
 }
 
 export interface SyllablePhonePlan extends LyricTranspilation {
@@ -72,6 +76,8 @@ export interface PhoneEvent {
   cls: PhoneClass;
   role: PhoneRole;
   note: ScoreNote;
+  tone: number;
+  vowelSign: number;
   phoneIndexInNote: number;
   phoneCountInNote: number;
 }
@@ -83,6 +89,7 @@ export interface ExpressionGauge {
   vibratoStartRatio: number;
   pitchDeltaFromPrev: number;
   pitchDeltaToNext: number;
+  tonalPitchOffset: number;
 }
 
 export interface MusicXmlParser {

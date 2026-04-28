@@ -1,4 +1,5 @@
 import { DOMParser } from "@xmldom/xmldom";
+import { canonicalizeVietnamese } from "../normalize.ts";
 import type { MusicXmlParser, ScoreBeat, ScoreDocument, ScoreNote, ScorePitch } from "./types.ts";
 
 type XmlElement = {
@@ -136,7 +137,11 @@ export class DomMusicXmlParser implements MusicXmlParser {
       isChord: boolean;
     },
   ): ScoreNote {
-    const lyric = first(note, "lyric");
+    const lyricEl = first(note, "lyric");
+    const lyricRaw = textOf(first(lyricEl, "text"));
+    const lyricText = (canonicalizeVietnamese(lyricRaw ?? "") || null)?.replace(/[.,!?;:]/g, "") ?? null;
+    const hasExtend = first(lyricEl, "extend") !== null;
+    
     return {
       id: meta.id,
       partId: meta.partId,
@@ -152,15 +157,16 @@ export class DomMusicXmlParser implements MusicXmlParser {
       isRest: first(note, "rest") !== null,
       isChord: meta.isChord,
       isGrace: first(note, "grace") !== null,
-      isCue: first(note, "cue") !== null,
+      isCue: first(note, "cue") !== null || note.getAttribute("size") === "cue",
       isPrintable: note.getAttribute("print-object") !== "no",
-      lyric: textOf(first(lyric, "text")),
+      lyric: lyricText,
       carriedPhones: null,
-      syllabic: syllabicOf(textOf(first(lyric, "syllabic"))),
+      carriedTone: null,
+      syllabic: syllabicOf(textOf(first(lyricEl, "syllabic"))),
       pitch: pitchOf(first(note, "pitch")),
       tie: tieOf(note),
       slur: slurOf(note),
-      hasBreath: first(note, "breath-mark") !== null,
+      hasBreath: first(note, "breath-mark") !== null || hasExtend, // Use extend as a hint for continuation
       dynamic: meta.state.dynamic,
       hasAccent: first(note, "accent") !== null || first(note, "strong-accent") !== null,
       hasStaccato: first(note, "staccato") !== null,

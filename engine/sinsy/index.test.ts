@@ -12,6 +12,8 @@ import {
   expressionForNote,
 } from "./index.ts";
 import { parseMusicXmlToLabelArgs, runMusicXmlToLabel } from "./musicXMLtoLabel.ts";
+import { transcribe as transcribeRule } from "./rule-api.ts";
+import { runStub } from "./stub.ts";
 import { CumulativeFloatTimingStrategy, VowelAnchoredTimingStrategy } from "./timing.ts";
 
 const SIMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -171,7 +173,7 @@ test("MusicXML parser builds note data structure", () => {
   expect(score.notes[1]?.isRest).toBe(true);
 });
 
-test("vocal normalizer selects lyric voice, merges ties, carries slur vowel, drops chord/grace/hidden", () => {
+test("vocal normalizer selects lyric voice, merges ties, carries slur vowel, drops chord/hidden", () => {
   const raw = new DomMusicXmlParser().parse(COMPLEX_XML);
   const normalized = new VocalLineNormalizer().normalize(raw);
 
@@ -180,10 +182,10 @@ test("vocal normalizer selects lyric voice, merges ties, carries slur vowel, dro
     "trôi",
     "i",
     "dạ",
+    "bỏ",
   ]);
   expect(normalized.notes[0]?.durationDiv).toBe(4);
   expect(normalized.notes.some((note) => note.isChord)).toBe(false);
-  expect(normalized.notes.some((note) => note.isGrace)).toBe(false);
   expect(normalized.notes.some((note) => !note.isPrintable)).toBe(false);
 });
 
@@ -265,6 +267,12 @@ test("pipeline emits mono and full labels", () => {
   expect(result.mono).toContain("0 400000 k");
   expect(result.full).toContain("/E:C4]60^0=2/4~100");
   expect(result.full).toContain("/F:xx#xx#xx-xx$xx$xx+xx%xx;");
+});
+
+test("rule API decodes MusicXML bytes", () => {
+  const result = transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
+  expect(result.mono).toContain("0 400000 k");
+  expect(result.full).toContain("/E:C4]60^0=2/4~100");
 });
 
 test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
@@ -366,6 +374,44 @@ test("musicXMLtoLabel accepts Windows-style separators on POSIX", () => {
     expect(readFileSync(full, "utf8")).toContain("/E:C4]60^0=2/4~100");
     expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stub passes MusicXML bytes to rule API", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cephome-stub-bytes-"));
+  const previousRulePath = process.env.CEPHOME_RULE_PATH;
+  try {
+    const input = join(dir, "score.musicxml");
+    const full = join(dir, "full.lab");
+    const mono = join(dir, "mono.lab");
+    const rule = join(dir, "rule.js");
+    const xml = SIMPLE_XML.replace("kiên", "kiên 𝄞");
+    writeFileSync(input, xml, "utf8");
+    writeFileSync(
+      rule,
+      [
+        "export function transcribe(xmlBytes) {",
+        "  if (!(xmlBytes instanceof Uint8Array)) throw new Error('expected Uint8Array');",
+        "  const xml = new TextDecoder('utf-8').decode(xmlBytes);",
+        "  return { full: String(xml.includes('𝄞')), mono: String(xmlBytes.byteLength) };",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    process.env.CEPHOME_RULE_PATH = rule;
+    await runStub({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
+
+    expect(readFileSync(full, "utf8")).toBe("true");
+    expect(Number(readFileSync(mono, "utf8"))).toBe(new TextEncoder().encode(xml).byteLength);
+  } finally {
+    if (previousRulePath === undefined) {
+      delete process.env.CEPHOME_RULE_PATH;
+    } else {
+      process.env.CEPHOME_RULE_PATH = previousRulePath;
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -81,11 +81,15 @@ function usage(): string {
   ].join("\n");
 }
 
-if (import.meta.main) {
+export async function main(argv: string[]): Promise<void> {
   try {
-    runMusicXmlToLabel(parseMusicXmlToLabelArgs(process.argv.slice(2)));
+    runMusicXmlToLabel(parseMusicXmlToLabelArgs(argv));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+}
+
+if (import.meta.main) {
+  void main(process.argv.slice(2));
 }

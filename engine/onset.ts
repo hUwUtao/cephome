@@ -4,17 +4,17 @@
  */
 
 const ONSET_MAP: Record<string, string[]> = {
-  ngh: ["n", "g"], // velar nasal onset → n,g
-  ng: ["n", "g"], // velar nasal as onset
-  nh: ["ny"], // /ɲ/ → ny (valid VOICEVOX palatalized)
+  ngh: ["n", "g"], // velar nasal proxy
+  ng: ["n", "g"],
+  nh: ["ny"],
   ch: ["ch"],
-  tr: ["ch"],
-  th: ["ty"], // aspirated → palatalized t
-  ph: ["f"], // Vietnamese ph = /f/
-  kh: ["k"], // aspirated → plain
+  tr: ["ty", "z"], // Hand-baked 'bite' from thuyenla.ccs
+  th: ["t", "h"], // Hand-baked aspiration
+  ph: ["f"],
+  kh: ["k"], // 'k' has more bite than 'h'
   gi: ["z"],
   gh: ["g"],
-  qu: ["k"], // medial w is added separately
+  qu: ["k"], // 'w' glide is handled by medial-w plan
   b: ["b"],
   c: ["k"],
   d: ["z"],
@@ -27,11 +27,11 @@ const ONSET_MAP: Record<string, string[]> = {
   n: ["n"],
   p: ["p"],
   r: ["z"],
-  s: ["s"],
+  s: ["s"], // Removed 'sh' per user preference
   t: ["t"],
   v: ["v"],
-  x: ["s"],
-  "": [], // null onset
+  x: ["s"], // Northern merger s/x -> s
+  "": [],
 };
 
 export function onsetToPhonemes(onset: string): string[] {

@@ -14,7 +14,7 @@ import { segmentSyllable, segmentWord } from "./segment.ts";
 import { onsetToPhonemes } from "./onset.ts";
 import { nucleusToPhonemes, codaToPhonemes } from "./van.ts";
 import { filterValidPhonemes } from "./validate.ts";
-import { extractTone } from "./normalize.ts";
+import { extractTone, canonicalizeVietnamese } from "./normalize.ts";
 
 /**
  * Clean text: keep alphabet and Vietnamese diacritics
@@ -22,7 +22,8 @@ import { extractTone } from "./normalize.ts";
  * Linebreaks treated as word separators (converted to spaces)
  */
 function cleanText(text: string): string {
-  return text
+  const canonical = canonicalizeVietnamese(text);
+  return canonical
     .split("")
     .map((char) => {
       const code = char.charCodeAt(0);

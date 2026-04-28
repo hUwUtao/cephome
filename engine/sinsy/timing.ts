@@ -30,6 +30,9 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
       previousEndDiv = note.endDiv;
 
       const phones = phonesForNote(note, lyricTranspiler);
+      const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
+      const tone = note.carriedTone ?? (transpiled?.tone ?? 0);
+      const vowelSign = transpiled?.vowelSign ?? 0;
       phones.forEach((phoneme, index) => {
         events.push({
           start,
@@ -38,6 +41,8 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
           cls: classifyPhone(phoneme),
           role: "anchor",
           note,
+          tone,
+          vowelSign,
           phoneIndexInNote: index,
           phoneCountInNote: phones.length,
         });
@@ -95,8 +100,11 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       const end = Math.floor(seconds * 10_000_000);
       previousEndDiv = note.endDiv;
 
-      const plan = planForNote(note, lyricTranspiler);
-      const windows = assignPhoneWindows(plan, start, end, this.options);
+      const planResult = planForNote(note, lyricTranspiler);
+      const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
+      const tone = note.carriedTone ?? (transpiled?.tone ?? 0);
+      const vowelSign = transpiled?.vowelSign ?? 0;
+      const windows = assignPhoneWindows(planResult, start, end, this.options);
       windows.forEach((window, index) => {
         events.push({
           start: window.start,
@@ -105,6 +113,8 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
           cls: classifyPhone(window.phone),
           role: window.role,
           note,
+          tone,
+          vowelSign,
           phoneIndexInNote: index,
           phoneCountInNote: windows.length,
         });
@@ -232,12 +242,17 @@ function applyBoundaryPrefire(
     if (prefire <= 0) continue;
 
     const previousLast = previous[previous.length - 1]!;
-    const newPreviousEnd = Math.max(previousLast.start + 1, boundary - prefire);
+    const previousLastDuration = previousLast.end - previousLast.start;
+    // Protect at least 40% of the last phoneme or 20ms, whichever is smaller
+    const protection = Math.min(previousLastDuration * 0.4, 200_000);
+    const safePrefire = Math.min(prefire, Math.max(0, previousLastDuration - protection));
+
+    const newPreviousEnd = Math.max(previousLast.start + 1, boundary - safePrefire);
     previousLast.end = Math.min(previousLast.end, newPreviousEnd);
 
     for (const event of current) {
-      event.start = Math.max(previousLast.end, event.start - prefire);
-      event.end = Math.max(event.start + 1, event.end - prefire);
+      event.start = Math.max(previousLast.end, event.start - safePrefire);
+      event.end = Math.max(event.start + 1, event.end - safePrefire);
     }
   }
 

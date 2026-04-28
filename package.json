@@ -7,20 +7,25 @@
     "dev": "bun --hot src/index.ts",
     "build:musicXMLtoLabel": "bun build --compile ./engine/sinsy/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel",
     "build:musicXMLtoLabel:win": "bun build --compile --target=bun-windows-x64 ./engine/sinsy/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel.exe",
-    "build:bin:win": "bun build --compile --target=bun-windows-x64 ./engine/sinsy/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel.exe",
+    "build:bin:win": "bun build --compile --target=bun-windows-x64 ./engine/sinsy/stub.ts --outfile ./bin/musicXMLtoLabel.exe",
+    "build:stub:win": "bun build --compile --target=bun-windows-x64 ./engine/sinsy/stub.ts --outfile ./bin/musicXMLtoLabel.exe",
+    "build:rule": "bun build ./engine/sinsy/rule-api.ts --minify --bundle --format esm --target bun --sourcemap=inline --outfile ./bin/rule.js",
     "build": "bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
     "start": "NODE_ENV=production bun src/index.ts",
-    "fmt": "oxfmt"
+    "fmt": "oxfmt",
+    "lint": "oxlint --type-aware --import-plugin --react-plugin"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.10",
-    "react": "^19",
-    "react-dom": "^19"
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "oxfmt": "^0.43.0"
+    "@types/bun": "^1.3.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "oxlint-tsgolint": "^0.22.1"
   }
 }

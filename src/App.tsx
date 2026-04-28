@@ -46,7 +46,7 @@ export function App() {
   }, [input]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(output);
+    void navigator.clipboard.writeText(output);
   };
 
   const handleClear = () => {

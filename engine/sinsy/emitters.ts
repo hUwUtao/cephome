@@ -94,7 +94,14 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     const note = event.note;
     const previousNote = distinctNote(events, index, -1);
     const nextNote = distinctNote(events, index, 1);
-    const expression = expressionForNote(note, previousNote, nextNote);
+    const expression = expressionForNote(
+      note,
+      previousNote,
+      nextNote,
+      event.tone,
+      event.phoneIndexInNote,
+      event.phoneCountInNote,
+    );
     const pitch = note.pitch?.name ?? "xx";
     const beat = `${note.beat.beats}/${note.beat.beatType}`;
     const tempo = String(Math.round(note.tempo));
@@ -118,21 +125,21 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     b[0] = String(phoneCount);
     b[1] = "1";
     b[2] = "1";
-    b[3] = "JPN";
-    b[4] = "0";
+    b[3] = "VIE"; // Vietnamese marker
+    b[4] = `${event.tone}|${event.vowelSign}`; // Tone 0-5 and Vowel Signature
 
     c[0] = "1";
     c[1] = "1";
     c[2] = "1";
-    c[3] = "JPN";
-    c[4] = "0";
+    c[3] = "VIE";
+    c[4] = `${event.tone}|${event.vowelSign}`;
 
     const d = fill(9);
     fillNoteSummary(d, previousNote);
 
     const e = fill(60);
     e[0] = pitch;
-    e[1] = String(note.pitch?.midi ?? 0);
+    e[1] = String(Math.round((note.pitch?.midi ?? 0) + expression.tonalPitchOffset));
     e[2] = String(expression.pitchDeltaFromPrev);
     e[3] = beat;
     e[4] = tempo;

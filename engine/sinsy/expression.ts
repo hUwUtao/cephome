@@ -17,6 +17,9 @@ export function expressionForNote(
   note: ScoreNote,
   previousNote: ScoreNote | null,
   nextNote: ScoreNote | null,
+  tone: number = 0,
+  phoneIndex: number = 0,
+  phoneCount: number = 1,
 ): ExpressionGauge {
   const durationSeconds = noteDurationSeconds(note);
   const energyBase = DYNAMIC_ENERGY[note.dynamic] ?? DYNAMIC_ENERGY.mf!;
@@ -32,7 +35,31 @@ export function expressionForNote(
     vibratoStartRatio: vibratoEnabled ? 0.35 : 0,
     pitchDeltaFromPrev: pitchDelta(previousNote, note),
     pitchDeltaToNext: pitchDelta(note, nextNote),
+    tonalPitchOffset: calculateTonalOffset(tone, phoneIndex, phoneCount),
   };
+}
+
+/**
+ * Calculate microtonal pitch offset (in semitones) for a given tone and phone position.
+ */
+function calculateTonalOffset(tone: number, index: number, count: number): number {
+  if (count <= 1) return 0;
+  const ratio = index / (count - 1);
+
+  switch (tone) {
+    case 1: // Huyền (Low falling)
+      return -0.5 * ratio;
+    case 2: // Sắc (High rising)
+      return 0.6 * ratio;
+    case 3: // Hỏi (Dipping)
+      return ratio < 0.5 ? -0.4 * (ratio * 2) : -0.4 + 0.4 * ((ratio - 0.5) * 2);
+    case 4: // Ngã (Rising + glottal)
+      return 0.8 * ratio;
+    case 5: // Nặng (Falling + sharp)
+      return -0.7 * ratio;
+    default:
+      return 0;
+  }
 }
 
 export function noteDurationSeconds(note: ScoreNote): number {

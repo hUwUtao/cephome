@@ -1,4 +1,15 @@
 /**
+ * Robustly canonicalize Vietnamese text.
+ * - Ensures NFC normalization.
+ * - This is 'safe' because it preserves all semantic content while fixing encoding drift.
+ */
+export function canonicalizeVietnamese(text: string): string {
+  if (!text) return "";
+  // NFC is the standard for modern Vietnamese web/mobile.
+  return text.normalize("NFC");
+}
+
+/**
  * Normalize Vietnamese text for consistent processing.
  * - Lowercase
  * - NFD (decompose combining marks)

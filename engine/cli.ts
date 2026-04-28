@@ -25,4 +25,4 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+void main().catch(console.error);
