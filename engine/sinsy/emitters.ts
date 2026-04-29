@@ -102,6 +102,7 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
       event.tone,
       event.phoneIndexInNote,
       event.phoneCountInNote,
+      event.velocity,
     );
     const pitch = note.pitch?.name ?? "xx";
     const beat = `${note.beat.beats}/${note.beat.beatType}`;

@@ -206,6 +206,32 @@ function scoreWithPitches(pitches: string[]): string {
 </score-partwise>`;
 }
 
+function scoreWithLyrics(lyrics: string[]): string {
+  const notes = lyrics
+    .map(
+      (lyric) => `
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <lyric><text>${lyric}</text></lyric>
+      </note>`,
+    )
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <direction><sound tempo="100"/></direction>
+      ${notes}
+    </measure>
+  </part>
+</score-partwise>`;
+}
+
 test("MusicXML parser builds note data structure", () => {
   const score = new DomMusicXmlParser().parse(SIMPLE_XML, "simple.musicxml");
   expect(score.divisions).toBe(2);
@@ -352,6 +378,117 @@ test("pipeline does not leak full-label separators inside accidental pitch field
   expect(result.full).not.toContain("/E:Cs4]");
 });
 
+test("pipeline applies phrase override as temporary dictionary entries", () => {
+  const override = "kiên z!40 | a~!110 |";
+  const result = new SinsyLabelPipeline({ phraseOverrideText: override }).serializeTrace(
+    SIMPLE_XML,
+  );
+
+  expect(result.phraseOverrideApplied).toBe(1);
+  expect(result.phraseOverrideWarnings).toEqual([]);
+  expect(result.score.notes.find((note) => note.lyric === "kiên")?.lyric).toBe("kiên");
+  expect(result.mono).toContain("0 400000 z");
+  expect(result.mono).toContain("400000 6000000 a");
+  expect(result.events.map((event) => event.velocity)).toEqual([40, 110, undefined]);
+  expect(result.full).toContain("=40@");
+  expect(result.full).toContain("=110@");
+});
+
+test("phrase override can omit bracketed ghost phones", () => {
+  const override = "kiên z | [w] a | n";
+  const kept = new SinsyLabelPipeline({ phraseOverrideText: override }).serializeTrace(SIMPLE_XML);
+  const omitted = new SinsyLabelPipeline({
+    phraseOverrideText: override,
+    phraseOverrideOptions: { omitGhost: true },
+  }).serializeTrace(SIMPLE_XML);
+
+  expect(kept.events.map((event) => event.phoneme)).toEqual(["z", "w", "a", "n", "pau"]);
+  expect(kept.events.find((event) => event.phoneme === "w")?.velocity).toBe(0);
+  expect(omitted.events.map((event) => event.phoneme)).toEqual(["z", "a", "n", "pau"]);
+});
+
+test("bracketed ghost phones have a fixed deadline and cannot linger", () => {
+  const override = "kiên ch | a [e] | n";
+  const result = new SinsyLabelPipeline({ phraseOverrideText: override }).serializeTrace(
+    SIMPLE_XML,
+  );
+  const ghost = result.events.find((event) => event.phoneme === "e")!;
+  const realDurations = result.events
+    .filter((event) => event.note.lyric === "kiên" && !event.ghost)
+    .map((event) => event.end - event.start);
+
+  expect(ghost.ghost).toBe(true);
+  expect(ghost.end - ghost.start).toBeLessThanOrEqual(150_000);
+  expect(realDurations.every((duration) => ghost.end - ghost.start < duration)).toBe(true);
+});
+
+test("dash override inserts a tiny anti-bond vacuum without omitting bracket ghosts", () => {
+  const override = "kiên z | a - [e] | n";
+  const result = new SinsyLabelPipeline({
+    phraseOverrideText: override,
+    phraseOverrideOptions: { omitGhost: true },
+  }).serializeTrace(SIMPLE_XML);
+  const vacuum = result.events.find((event) => event.vacuum)!;
+
+  expect(result.events.map((event) => event.phoneme)).toEqual(["z", "a", "sil", "n", "pau"]);
+  expect(vacuum.ghost).toBe(true);
+  expect(vacuum.end - vacuum.start).toBeLessThanOrEqual(40_000);
+});
+
+test("dash vacuum stays when neighboring clusters are light", () => {
+  const override = `
+đón d | o | N
+chân ch | a - [e] | N
+tôi t | o | i
+`;
+  const result = new SinsyLabelPipeline({
+    phraseOverrideText: override,
+    phraseOverrideOptions: { omitGhost: true },
+  }).serializeTrace(scoreWithLyrics(["đón", "chân", "tôi"]));
+  const vacuum = result.events.find((event) => event.vacuum)!;
+
+  expect(result.events.map((event) => event.phoneme)).toEqual([
+    "d",
+    "o",
+    "N",
+    "ch",
+    "a",
+    "sil",
+    "N",
+    "t",
+    "o",
+    "i",
+  ]);
+  expect(vacuum.end - vacuum.start).toBeLessThanOrEqual(40_000);
+});
+
+test("dash vacuum collapses when neighboring clusters are crowded", () => {
+  const override = `
+dừng z | u | N g
+chân ch | a - [e] | N
+trên ty z | e | N
+`;
+  const result = new SinsyLabelPipeline({
+    phraseOverrideText: override,
+    phraseOverrideOptions: { omitGhost: true },
+  }).serializeTrace(scoreWithLyrics(["dừng", "chân", "trên"]));
+
+  expect(result.events.some((event) => event.vacuum)).toBe(false);
+  expect(result.events.map((event) => event.phoneme)).toEqual([
+    "z",
+    "u",
+    "N",
+    "g",
+    "ch",
+    "a",
+    "N",
+    "ty",
+    "z",
+    "e",
+    "N",
+  ]);
+});
+
 test("rule API decodes MusicXML bytes", () => {
   const result = transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
   expect(result.mono).toContain("0 400000 k");
@@ -363,6 +500,15 @@ test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
     inputPath: "score.musicxml",
     fullLabelPath: "full.lab",
     monoLabelPath: "mono.lab",
+    omitGhost: false,
+  });
+  expect(
+    parseMusicXmlToLabelArgs(["--omit-ghost", "score.musicxml", "full.lab", "mono.lab"]),
+  ).toEqual({
+    inputPath: "score.musicxml",
+    fullLabelPath: "full.lab",
+    monoLabelPath: "mono.lab",
+    omitGhost: true,
   });
 });
 
@@ -379,6 +525,27 @@ test("musicXMLtoLabel runner writes full and mono files", () => {
     expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
     expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
     expect(statSync(join(dir, "score", "label", "timing")).isDirectory()).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("musicXMLtoLabel reads existing phrase override and does not overwrite it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-override-"));
+  try {
+    const input = join(dir, "score.musicxml");
+    const full = join(dir, "score", "label", "full", "score.lab");
+    const mono = join(dir, "score", "label", "mono", "score.lab");
+    const override = `${input}.override.txt`;
+    const overrideText = "kiên z | a |";
+    writeFileSync(input, SIMPLE_XML, "utf8");
+    writeFileSync(override, overrideText, "utf8");
+
+    runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
+
+    expect(readFileSync(override, "utf8")).toBe(overrideText);
+    expect(readFileSync(mono, "utf8")).toContain("0 400000 z");
+    expect(readFileSync(full, "utf8")).toContain("z+a");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

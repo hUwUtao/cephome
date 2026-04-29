@@ -6,22 +6,31 @@ export interface StubArgs {
   inputPath: string;
   fullLabelPath: string;
   monoLabelPath: string;
+  omitGhost?: boolean;
 }
 
 export interface RuleModule {
-  transcribe: (xmlBytes: Uint8Array, sourceName?: string) => { full: string; mono: string };
+  transcribe?: RuleTranscriber;
+  transcribeWithOverrides?: RuleTranscriber;
 }
 
+type RuleTranscriber = (
+  xmlBytes: Uint8Array,
+  sourceName?: string,
+) => { full: string; mono: string } | Promise<{ full: string; mono: string }>;
+
 export function parseStubArgs(argv: string[]): StubArgs {
-  const args = argv.filter((arg) => arg !== "--");
+  const omitGhost = argv.includes("--omit-ghost");
+  const args = argv.filter((arg) => arg !== "--" && arg !== "--omit-ghost");
   if (args.length !== 3 || args.includes("-h") || args.includes("--help")) {
-    throw new Error("usage: musicXMLtoLabel <input.musicxml> <full.lab> <mono.lab>");
+    throw new Error("usage: musicXMLtoLabel [--omit-ghost] <input.musicxml> <full.lab> <mono.lab>");
   }
 
   return {
     inputPath: args[0]!,
     fullLabelPath: args[1]!,
     monoLabelPath: args[2]!,
+    omitGhost,
   };
 }
 
@@ -42,14 +51,19 @@ export async function runStub(args: StubArgs): Promise<void> {
   prepareOutputFile(monoLabelPath);
 
   console.error(`Load rule -> ${rulePath}`);
-  const { transcribe } = await loadRule(rulePath);
+  const restorePhraseOverrideHooks = installPhraseOverrideHooks(inputPath, args.omitGhost === true);
+  try {
+    const transcribe = await loadRule(rulePath);
 
-  console.error(`Convert MusicXML to label -> ${inputPath}`);
-  const xmlBytes = readFileSync(inputPath);
-  const result = transcribe(xmlBytes, inputPath);
+    console.error(`Convert MusicXML to label -> ${inputPath}`);
+    const xmlBytes = readFileSync(inputPath);
+    const result = await transcribe(xmlBytes, inputPath);
 
-  writeFileSync(fullLabelPath, result.full, "utf8");
-  writeFileSync(monoLabelPath, result.mono, "utf8");
+    writeFileSync(fullLabelPath, result.full, "utf8");
+    writeFileSync(monoLabelPath, result.mono, "utf8");
+  } finally {
+    restorePhraseOverrideHooks();
+  }
 
   console.error(`output full label -> ${fullLabelPath}`);
   console.error(`output mono label -> ${monoLabelPath}`);
@@ -73,13 +87,14 @@ export function findRulePath(): string | undefined {
   return candidates.find((path) => existsSync(path));
 }
 
-async function loadRule(rulePath: string): Promise<RuleModule> {
+async function loadRule(rulePath: string): Promise<RuleTranscriber> {
   const module = (await import(pathToFileURL(rulePath).href)) as Partial<RuleModule>;
-  if (typeof module.transcribe !== "function") {
+  const transcribe = module.transcribeWithOverrides ?? module.transcribe;
+  if (typeof transcribe !== "function") {
     throw new Error(`${rulePath} does not export transcribe(xmlBytes, sourceName)`);
   }
 
-  return module as RuleModule;
+  return transcribe;
 }
 
 function normalizeCliPath(path: string): string {
@@ -111,6 +126,43 @@ function prepareOutputFile(path: string): void {
   }
 
   mkdirSync(parent, { recursive: true });
+}
+
+function installPhraseOverrideHooks(inputPath: string, omitGhost: boolean): () => void {
+  const path = `${inputPath}.override.txt`;
+  const previousRead: unknown = Reflect.get(globalThis, "read_phrase_override");
+  const previousWrite: unknown = Reflect.get(globalThis, "write_phrase_override");
+  const previousOmitGhost: unknown = Reflect.get(globalThis, "omit_phrase_ghost");
+  Reflect.set(globalThis, "omit_phrase_ghost", omitGhost);
+  Reflect.set(globalThis, "read_phrase_override", async () => {
+    try {
+      if (!existsSync(path) || !statSync(path).isFile()) return "";
+      return readFileSync(path, "utf8");
+    } catch {
+      return "";
+    }
+  });
+  Reflect.set(globalThis, "write_phrase_override", async (content: string) => {
+    try {
+      if (!existsSync(path)) writeFileSync(path, content, "utf8");
+    } catch {
+      // Best-effort sidecar only.
+    }
+    return path;
+  });
+  return () => {
+    restoreGlobal("read_phrase_override", previousRead);
+    restoreGlobal("write_phrase_override", previousWrite);
+    restoreGlobal("omit_phrase_ghost", previousOmitGhost);
+  };
+}
+
+function restoreGlobal(identifier: string, value: unknown): void {
+  if (value === undefined) {
+    Reflect.deleteProperty(globalThis, identifier);
+    return;
+  }
+  Reflect.set(globalThis, identifier, value);
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {

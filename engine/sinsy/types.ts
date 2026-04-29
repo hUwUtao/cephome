@@ -80,6 +80,9 @@ export interface TimedPhonePlan {
   phone: string;
   role: PhoneRole;
   weight: number;
+  ghost?: boolean;
+  vacuum?: boolean;
+  velocity?: number;
   vowelSign?: number;
   metadata?: VietnameseSyllableMetadata;
 }
@@ -98,6 +101,9 @@ export interface PhoneEvent {
   tone: number;
   vowelSign: number;
   metadata: VietnameseSyllableMetadata;
+  ghost?: boolean;
+  vacuum?: boolean;
+  velocity?: number;
   phoneIndexInNote: number;
   phoneCountInNote: number;
 }

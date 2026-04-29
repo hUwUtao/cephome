@@ -4,11 +4,16 @@ import { segmentSyllable } from "../segment.ts";
 import type { RoleAwareLyricTranspiler, SyllablePhonePlan, TimedPhonePlan } from "./types.ts";
 import { validateSinsyPhones } from "./phoneme.ts";
 import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "./vietnamese-metadata.ts";
+import { dictionaryPlanForLyric } from "./dictionary.ts";
+import type { VietnameseDictionaryEntries } from "./dictionary.ts";
 
 type SinsyVietnameseMode = "transparent" | "voicevox" | "singing";
 
 export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
-  constructor(private readonly mode: SinsyVietnameseMode = "singing") {}
+  constructor(
+    private readonly mode: SinsyVietnameseMode = "singing",
+    private readonly dictionaryEntries: VietnameseDictionaryEntries = {},
+  ) {}
 
   transpile(lyric: string): SyllablePhonePlan {
     return this.plan(lyric);
@@ -18,6 +23,17 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
     try {
       const parsed = segmentSyllable(lyric);
       const metadata = metadataForLyric(lyric);
+      const dictionaryPlan = dictionaryPlanForLyric(lyric, this.dictionaryEntries);
+      if (dictionaryPlan) {
+        return filterPlan(
+          lyric,
+          parsed.tone,
+          metadata.vowelSign,
+          metadata,
+          dictionaryPlan.plan,
+          dictionaryPlan.warnings,
+        );
+      }
       const plan: TimedPhonePlan[] = [];
 
       plan.push(...onsetPlan(parsed.onset));
@@ -94,6 +110,7 @@ function filterPlan(
   vowelSign: number,
   metadata: SyllablePhonePlan["metadata"],
   plan: TimedPhonePlan[],
+  warnings: string[] = [],
 ): SyllablePhonePlan {
   const invalid = validateSinsyPhones(plan.map((item) => item.phone));
   const filtered = plan.filter((item) => !invalid.includes(item.phone));
@@ -104,6 +121,9 @@ function filterPlan(
     vowelSign,
     metadata,
     plan: filtered.map((f) => ({ ...f, vowelSign, metadata })),
-    warnings: invalid.map((phone) => `${source}: unsupported Sinsy phone "${phone}"`),
+    warnings: [
+      ...warnings,
+      ...invalid.map((phone) => `${source}: unsupported Sinsy phone "${phone}"`),
+    ],
   };
 }

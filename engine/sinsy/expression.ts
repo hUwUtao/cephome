@@ -20,10 +20,13 @@ export function expressionForNote(
   tone: number = 0,
   phoneIndex: number = 0,
   phoneCount: number = 1,
+  velocity?: number,
 ): ExpressionGauge {
   const durationSeconds = noteDurationSeconds(note);
   const energyBase = DYNAMIC_ENERGY[note.dynamic] ?? DYNAMIC_ENERGY.mf!;
-  const energy = clamp(energyBase + (note.hasAccent ? 10 : 0) - (note.hasStaccato ? 8 : 0), 0, 127);
+  const markedEnergy =
+    velocity ?? energyBase + (note.hasAccent ? 10 : 0) - (note.hasStaccato ? 8 : 0);
+  const energy = clamp(markedEnergy, 0, 127);
   const vibratoEnabled = !note.isRest && !note.hasStaccato && durationSeconds >= 0.65;
 
   return {

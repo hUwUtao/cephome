@@ -4,15 +4,19 @@ import { basename, dirname, join, sep } from "node:path";
 import { SinsyLabelPipeline } from "./index.ts";
 import type { SinsySerializationTrace } from "./index.ts";
 import type { PhoneEvent, ScoreNote } from "./types.ts";
+import { buildPhraseOverrideText } from "./phrase-override.ts";
+import { readGlobalPhraseOverride, writeGlobalPhraseOverride } from "./phrase-override-hooks.ts";
 
 export interface MusicXmlToLabelArgs {
   inputPath: string;
   fullLabelPath: string;
   monoLabelPath: string;
+  omitGhost?: boolean;
 }
 
 export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
-  const args = argv.filter((arg) => arg !== "--");
+  const omitGhost = argv.includes("--omit-ghost");
+  const args = argv.filter((arg) => arg !== "--" && arg !== "--omit-ghost");
   if (args.length !== 3 || args.includes("-h") || args.includes("--help")) {
     throw new Error(usage());
   }
@@ -21,10 +25,15 @@ export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
     inputPath: args[0]!,
     fullLabelPath: args[1]!,
     monoLabelPath: args[2]!,
+    omitGhost,
   };
 }
 
 export function runMusicXmlToLabel(args: MusicXmlToLabelArgs): void {
+  runMusicXmlToLabelCore(args, readLocalPhraseOverride, writeLocalPhraseOverride);
+}
+
+export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promise<void> {
   const inputPath = normalizeCliPath(args.inputPath);
   const fullLabelPath = normalizeCliPath(args.fullLabelPath);
   const monoLabelPath = normalizeCliPath(args.monoLabelPath);
@@ -36,7 +45,47 @@ export function runMusicXmlToLabel(args: MusicXmlToLabelArgs): void {
 
   console.error(`Convert MusicXML to label -> ${inputPath}`);
   const xml = readFileSync(inputPath, "utf8");
-  const result = new SinsyLabelPipeline().serializeTrace(xml, inputPath);
+  const phraseOverrideText = await readPhraseOverrideWithHooks(inputPath);
+  const result = new SinsyLabelPipeline({
+    phraseOverrideText,
+    phraseOverrideOptions: { omitGhost: args.omitGhost },
+  }).serializeTrace(xml, inputPath);
+  if (!phraseOverrideText?.trim()) {
+    await writePhraseOverrideWithHooks(inputPath, buildPhraseOverrideText(result.score));
+  }
+  console.error(buildDiagnosticReport(result));
+
+  writeFileSync(fullLabelPath, result.full, "utf8");
+  writeFileSync(monoLabelPath, result.mono, "utf8");
+
+  console.error(`output full label -> ${fullLabelPath}`);
+  console.error(`output mono label -> ${monoLabelPath}`);
+}
+
+function runMusicXmlToLabelCore(
+  args: MusicXmlToLabelArgs,
+  readPhraseOverride: (inputPath: string) => string | null,
+  writePhraseOverride: (inputPath: string, content: string) => void,
+): void {
+  const inputPath = normalizeCliPath(args.inputPath);
+  const fullLabelPath = normalizeCliPath(args.fullLabelPath);
+  const monoLabelPath = normalizeCliPath(args.monoLabelPath);
+
+  assertInputFile(inputPath);
+  prepareOutputFile(fullLabelPath);
+  prepareOutputFile(monoLabelPath);
+  prepareTimingLabelDirectory(fullLabelPath);
+
+  console.error(`Convert MusicXML to label -> ${inputPath}`);
+  const xml = readFileSync(inputPath, "utf8");
+  const phraseOverrideText = readPhraseOverride(inputPath);
+  const result = new SinsyLabelPipeline({
+    phraseOverrideText,
+    phraseOverrideOptions: { omitGhost: args.omitGhost },
+  }).serializeTrace(xml, inputPath);
+  if (!phraseOverrideText?.trim()) {
+    writePhraseOverride(inputPath, buildPhraseOverrideText(result.score));
+  }
   console.error(buildDiagnosticReport(result));
 
   writeFileSync(fullLabelPath, result.full, "utf8");
@@ -89,6 +138,7 @@ function buildDiagnosticReport(result: SinsySerializationTrace): string {
   lines.push(`badFullRows=${badFullRows.length}`);
   lines.push(`criticalXx=${criticalXx.length}`);
   lines.push(`symbolicContext=${symbolicContext.length}`);
+  lines.push(`phraseOverrideApplied=${result.phraseOverrideApplied}`);
   appendList(lines, "notes", notes.map(noteSummary));
   appendList(lines, "events", events.map(eventSummary));
   appendList(lines, "badDurationEvents", badDurations.map(eventSummary));
@@ -109,6 +159,7 @@ function buildDiagnosticReport(result: SinsySerializationTrace): string {
     "symbolicContextRows",
     symbolicContext.map((row) => `${row.index}:${row.text}`),
   );
+  appendList(lines, "phraseOverrideWarnings", result.phraseOverrideWarnings);
   return lines.join("\n");
 }
 
@@ -242,9 +293,41 @@ function prepareTimingLabelDirectory(fullLabelPath: string): void {
   mkdirSync(timingDir, { recursive: true });
 }
 
+function phraseOverridePath(inputPath: string): string {
+  return `${inputPath}.override.txt`;
+}
+
+function readLocalPhraseOverride(inputPath: string): string | null {
+  const path = phraseOverridePath(inputPath);
+  if (!existsSync(path) || !statSync(path).isFile()) return null;
+  return readFileSync(path, "utf8");
+}
+
+function writeLocalPhraseOverride(inputPath: string, content: string): void {
+  const path = phraseOverridePath(inputPath);
+  try {
+    if (existsSync(path)) return;
+    writeFileSync(path, content, "utf8");
+    console.error(`output phrase override -> ${path}`);
+  } catch {
+    // Best-effort convenience file only; label generation must not fail here.
+  }
+}
+
+async function readPhraseOverrideWithHooks(inputPath: string): Promise<string | null> {
+  const fromHook = await readGlobalPhraseOverride();
+  if (fromHook?.trim()) return fromHook;
+  return readLocalPhraseOverride(inputPath);
+}
+
+async function writePhraseOverrideWithHooks(inputPath: string, content: string): Promise<void> {
+  const wroteViaHook = await writeGlobalPhraseOverride(content);
+  if (!wroteViaHook) writeLocalPhraseOverride(inputPath, content);
+}
+
 function usage(): string {
   return [
-    "usage: musicXMLtoLabel <input.musicxml> <full.lab> <mono.lab>",
+    "usage: musicXMLtoLabel [--omit-ghost] <input.musicxml> <full.lab> <mono.lab>",
     "",
     "Drop-in NEUTRINO musicXMLtoLabel substitute.",
   ].join("\n");
@@ -252,7 +335,7 @@ function usage(): string {
 
 export async function main(argv: string[]): Promise<void> {
   try {
-    runMusicXmlToLabel(parseMusicXmlToLabelArgs(argv));
+    await runMusicXmlToLabelAsync(parseMusicXmlToLabelArgs(argv));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

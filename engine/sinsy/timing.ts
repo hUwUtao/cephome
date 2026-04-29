@@ -46,6 +46,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
           tone,
           vowelSign,
           metadata,
+          velocity: undefined,
           phoneIndexInNote: index,
           phoneCountInNote: phones.length,
         });
@@ -62,6 +63,10 @@ export interface VowelAnchoredTimingOptions {
   tailRatio: number;
   maxTailSeconds: number;
   maxNonAnchorRatio: number;
+  maxGhostSeconds: number;
+  maxGhostRatio: number;
+  maxVacuumSeconds: number;
+  maxVacuumRatio: number;
   prefireStrength: number;
   lingerRatio: number;
   maxLingerSeconds: number;
@@ -78,6 +83,10 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       tailRatio: options.tailRatio ?? 0.25,
       maxTailSeconds: options.maxTailSeconds ?? 0.12,
       maxNonAnchorRatio: options.maxNonAnchorRatio ?? 0.6,
+      maxGhostSeconds: options.maxGhostSeconds ?? 0.015,
+      maxGhostRatio: options.maxGhostRatio ?? 0.08,
+      maxVacuumSeconds: options.maxVacuumSeconds ?? 0.004,
+      maxVacuumRatio: options.maxVacuumRatio ?? 0.02,
       prefireStrength: options.prefireStrength ?? 0.45,
       lingerRatio: options.lingerRatio ?? 0.18,
       maxLingerSeconds: options.maxLingerSeconds ?? 0.08,
@@ -120,13 +129,16 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
           tone,
           vowelSign,
           metadata: window.metadata ?? metadata,
+          ghost: window.ghost,
+          vacuum: window.vacuum,
+          velocity: window.velocity,
           phoneIndexInNote: index,
           phoneCountInNote: windows.length,
         });
       });
     }
 
-    return applyBoundaryPrefire(events, this.options);
+    return collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options));
   }
 }
 
@@ -194,7 +206,7 @@ function assignPhoneWindows(
   const tail = plan.filter((item) => item.role === "tail" || item.role === "breath");
 
   if (anchor.length === 0) {
-    return splitWindow(plan, start, end);
+    return splitWindow(plan, start, end, options);
   }
 
   let preDur =
@@ -214,9 +226,9 @@ function assignPhoneWindows(
   const preEnd = start + Math.floor(preDur);
   const tailStart = end - Math.floor(tailDur);
   return [
-    ...splitWindow(pre, start, preEnd),
-    ...splitWindow(anchor, preEnd, tailStart),
-    ...splitWindow(tail, tailStart, end),
+    ...splitWindow(pre, start, preEnd, options),
+    ...splitWindow(anchor, preEnd, tailStart, options),
+    ...splitWindow(tail, tailStart, end, options),
   ];
 }
 
@@ -282,6 +294,63 @@ function groupByNote(events: PhoneEvent[]): PhoneEvent[][] {
   return groups;
 }
 
+function collapseCrowdedVacuumEvents(events: PhoneEvent[]): PhoneEvent[] {
+  const groups = groupByNote(events);
+  const collapsed = new Set<PhoneEvent>();
+
+  groups.forEach((group, groupIndex) => {
+    const previous = groups[groupIndex - 1];
+    const next = groups[groupIndex + 1];
+    if (trailingConsonantCount(previous) < 2 && leadingConsonantCount(next) < 2) return;
+
+    for (let eventIndex = 0; eventIndex < group.length; eventIndex++) {
+      const event = group[eventIndex]!;
+      if (!event.vacuum) continue;
+      const receiver = group[eventIndex + 1] ?? group[eventIndex - 1];
+      if (receiver) {
+        if (receiver.start >= event.end) receiver.start = event.start;
+        else receiver.end = Math.max(receiver.end, event.end);
+      }
+      collapsed.add(event);
+    }
+  });
+
+  return renumberPhoneIndexes(events.filter((event) => !collapsed.has(event)));
+}
+
+function trailingConsonantCount(group: PhoneEvent[] | undefined): number {
+  if (!group) return 0;
+  let count = 0;
+  for (let index = group.length - 1; index >= 0; index--) {
+    const event = group[index]!;
+    if (event.ghost || event.role === "breath") continue;
+    if (event.cls === "v") break;
+    if (event.cls === "c") count++;
+  }
+  return count;
+}
+
+function leadingConsonantCount(group: PhoneEvent[] | undefined): number {
+  if (!group) return 0;
+  let count = 0;
+  for (const event of group) {
+    if (event.ghost || event.role === "breath") continue;
+    if (event.cls === "v") break;
+    if (event.cls === "c") count++;
+  }
+  return count;
+}
+
+function renumberPhoneIndexes(events: PhoneEvent[]): PhoneEvent[] {
+  for (const group of groupByNote(events)) {
+    group.forEach((event, index) => {
+      event.phoneIndexInNote = index;
+      event.phoneCountInNote = group.length;
+    });
+  }
+  return events;
+}
+
 function sumDurations(events: Array<{ start: number; end: number; role: PhoneRole }>): number {
   return events.reduce((sum, event) => sum + Math.max(0, event.end - event.start), 0);
 }
@@ -290,16 +359,67 @@ function splitWindow(
   plan: TimedPhonePlan[],
   start: number,
   end: number,
+  options: VowelAnchoredTimingOptions,
 ): Array<TimedPhonePlan & { start: number; end: number }> {
   if (plan.length === 0) return [];
   const total = Math.max(1, end - start);
   const weightSum = plan.reduce((sum, item) => sum + Math.max(item.weight, 0.01), 0);
+  const maxGhostDuration = Math.max(
+    1,
+    Math.floor(Math.min(options.maxGhostSeconds * 10_000_000, total * options.maxGhostRatio)),
+  );
+  const maxVacuumDuration = Math.max(
+    1,
+    Math.floor(Math.min(options.maxVacuumSeconds * 10_000_000, total * options.maxVacuumRatio)),
+  );
+  const durations = plan.map((item) =>
+    Math.max(1, Math.floor((total * Math.max(item.weight, 0.01)) / weightSum)),
+  );
+  let durationSum = durations.reduce((sum, duration) => sum + duration, 0);
+  durations[durations.length - 1] = Math.max(
+    1,
+    durations[durations.length - 1]! + total - durationSum,
+  );
+
+  let savedGhostDuration = 0;
+  for (let index = 0; index < plan.length; index++) {
+    const item = plan[index]!;
+    const maxDuration = item.vacuum ? maxVacuumDuration : maxGhostDuration;
+    if (!item.ghost || durations[index]! <= maxDuration) continue;
+    savedGhostDuration += durations[index]! - maxDuration;
+    durations[index] = maxDuration;
+  }
+
+  const realWeightSum = plan.reduce(
+    (sum, item) => (item.ghost ? sum : sum + Math.max(item.weight, 0.01)),
+    0,
+  );
+  if (savedGhostDuration > 0 && realWeightSum > 0) {
+    let remaining = savedGhostDuration;
+    let lastRealIndex = -1;
+    for (let index = 0; index < plan.length; index++) {
+      const item = plan[index]!;
+      if (item.ghost) continue;
+      lastRealIndex = index;
+      const addition = Math.floor(
+        (savedGhostDuration * Math.max(item.weight, 0.01)) / realWeightSum,
+      );
+      durations[index] = durations[index]! + addition;
+      remaining -= addition;
+    }
+    if (lastRealIndex >= 0) durations[lastRealIndex] = durations[lastRealIndex]! + remaining;
+  }
+
+  durationSum = durations.reduce((sum, duration) => sum + duration, 0);
+  durations[durations.length - 1] = Math.max(
+    1,
+    durations[durations.length - 1]! + total - durationSum,
+  );
+
   let cursor = start;
   return plan.map((item, index) => {
     const isLast = index === plan.length - 1;
-    const next = isLast
-      ? end
-      : cursor + Math.max(1, Math.floor((total * Math.max(item.weight, 0.01)) / weightSum));
+    const next = isLast ? end : cursor + durations[index]!;
     const event = { ...item, start: cursor, end: Math.max(next, cursor + 1) };
     cursor = event.end;
     return event;
