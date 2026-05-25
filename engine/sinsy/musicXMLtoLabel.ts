@@ -2,8 +2,18 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, sep } from "node:path";
 import { SinsyLabelPipeline } from "./index.ts";
+import { flatTtsToLabel, parseTextToScore } from "./flat-tts.ts";
 import type { SinsySerializationTrace } from "./index.ts";
 import type { PhoneEvent, ScoreNote } from "./types.ts";
+
+function isXml(content: string): boolean {
+  const trimmed = content.trim();
+  return (
+    trimmed.startsWith("<?xml") ||
+    trimmed.startsWith("<score-partwise") ||
+    trimmed.startsWith("<score-timewise")
+  );
+}
 import { buildPhraseOverrideText } from "./phrase-override.ts";
 import { readGlobalPhraseOverride, writeGlobalPhraseOverride } from "./phrase-override-hooks.ts";
 
@@ -44,15 +54,45 @@ export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promis
   prepareTimingLabelDirectory(fullLabelPath);
 
   console.error(`Convert MusicXML to label -> ${inputPath}`);
-  const xml = readFileSync(inputPath, "utf8");
+  const content = readFileSync(inputPath, "utf8");
+  if (!isXml(content)) {
+    console.error("[cephome] mode: Flat-TTS Mode");
+    const overridePath = phraseOverridePath(inputPath);
+    const overrideExists = existsSync(overridePath) && statSync(overridePath).isFile();
+    console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
+
+    const score = parseTextToScore(content);
+    let totalSeconds = 0;
+    for (const note of score.notes) {
+      totalSeconds += (note.durationDiv / note.divisions) * (60 / note.tempo);
+    }
+    console.error(`[cephome] track duration: ${totalSeconds.toFixed(3)} seconds`);
+
+    const result = flatTtsToLabel(content);
+    writeFileSync(fullLabelPath, result.full, "utf8");
+    writeFileSync(monoLabelPath, result.mono, "utf8");
+    console.error(`output full label -> ${fullLabelPath}`);
+    console.error(`output mono label -> ${monoLabelPath}`);
+    return;
+  }
+  console.error("[cephome] mode: Music Mode");
   const phraseOverrideText = await readPhraseOverrideWithHooks(inputPath);
+  const overridePath = phraseOverridePath(inputPath);
+  const overrideExists =
+    (existsSync(overridePath) && statSync(overridePath).isFile()) || !!phraseOverrideText;
+  console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
+
   const result = new SinsyLabelPipeline({
     phraseOverrideText,
     phraseOverrideOptions: { omitGhost: args.omitGhost },
-  }).serializeTrace(xml, inputPath);
+  }).serializeTrace(content, inputPath);
   if (!phraseOverrideText?.trim()) {
     await writePhraseOverrideWithHooks(inputPath, buildPhraseOverrideText(result.score));
   }
+  const lastEvent = result.events[result.events.length - 1];
+  const durationSeconds = lastEvent ? lastEvent.end / 10_000_000 : 0;
+  console.error(`[cephome] track duration: ${durationSeconds.toFixed(3)} seconds`);
+
   console.error(buildDiagnosticReport(result));
 
   writeFileSync(fullLabelPath, result.full, "utf8");
@@ -77,15 +117,45 @@ function runMusicXmlToLabelCore(
   prepareTimingLabelDirectory(fullLabelPath);
 
   console.error(`Convert MusicXML to label -> ${inputPath}`);
-  const xml = readFileSync(inputPath, "utf8");
+  const content = readFileSync(inputPath, "utf8");
+  if (!isXml(content)) {
+    console.error("[cephome] mode: Flat-TTS Mode");
+    const overridePath = phraseOverridePath(inputPath);
+    const overrideExists = existsSync(overridePath) && statSync(overridePath).isFile();
+    console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
+
+    const score = parseTextToScore(content);
+    let totalSeconds = 0;
+    for (const note of score.notes) {
+      totalSeconds += (note.durationDiv / note.divisions) * (60 / note.tempo);
+    }
+    console.error(`[cephome] track duration: ${totalSeconds.toFixed(3)} seconds`);
+
+    const result = flatTtsToLabel(content);
+    writeFileSync(fullLabelPath, result.full, "utf8");
+    writeFileSync(monoLabelPath, result.mono, "utf8");
+    console.error(`output full label -> ${fullLabelPath}`);
+    console.error(`output mono label -> ${monoLabelPath}`);
+    return;
+  }
+  console.error("[cephome] mode: Music Mode");
   const phraseOverrideText = readPhraseOverride(inputPath);
+  const overridePath = phraseOverridePath(inputPath);
+  const overrideExists =
+    (existsSync(overridePath) && statSync(overridePath).isFile()) || !!phraseOverrideText;
+  console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
+
   const result = new SinsyLabelPipeline({
     phraseOverrideText,
     phraseOverrideOptions: { omitGhost: args.omitGhost },
-  }).serializeTrace(xml, inputPath);
+  }).serializeTrace(content, inputPath);
   if (!phraseOverrideText?.trim()) {
     writePhraseOverride(inputPath, buildPhraseOverrideText(result.score));
   }
+  const lastEvent = result.events[result.events.length - 1];
+  const durationSeconds = lastEvent ? lastEvent.end / 10_000_000 : 0;
+  console.error(`[cephome] track duration: ${durationSeconds.toFixed(3)} seconds`);
+
   console.error(buildDiagnosticReport(result));
 
   writeFileSync(fullLabelPath, result.full, "utf8");

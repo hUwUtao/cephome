@@ -104,4 +104,5 @@ export * from "./phrase-override-hooks.ts";
 export * from "./timing.ts";
 export * from "./transpiler.ts";
 export * from "./voice-select.ts";
+export * from "./flat-tts.ts";
 export type * from "./types.ts";
