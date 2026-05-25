@@ -45,7 +45,9 @@ export const SINSY_PHONE_SET = new Set([
 
 export function classifyPhone(phone: string): PhoneClass {
   if (["a", "i", "u", "e", "o"].includes(phone)) return "v";
-  if (["pau", "sil", "br"].includes(phone)) return "p";
+  if (phone === "sil") return "s";
+  if (phone === "pau") return "p";
+  if (phone === "br") return "b";
   return "c";
 }
 

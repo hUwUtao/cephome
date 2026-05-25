@@ -112,20 +112,19 @@ function voicevoxCodaToPhonemes(coda: string): string[] {
 export const NUCLEUS_PRIORITY = ["o", "a", "e", "u", "i", "y"];
 
 export function getDominantVowelPhone(phones: string[]): string {
-	if (phones.length === 0) return "";
-	let bestPhone = phones[0]!;
-	let bestRank = NUCLEUS_PRIORITY.indexOf(bestPhone);
-	if (bestRank === -1) bestRank = 999;
+  if (phones.length === 0) return "";
+  let bestPhone = phones[0]!;
+  let bestRank = NUCLEUS_PRIORITY.indexOf(bestPhone);
+  if (bestRank === -1) bestRank = 999;
 
-	for (let i = 1; i < phones.length; i++) {
-		const phone = phones[i]!;
-		let rank = NUCLEUS_PRIORITY.indexOf(phone);
-		if (rank === -1) rank = 999;
-		if (rank < bestRank) {
-			bestRank = rank;
-			bestPhone = phone;
-		}
-	}
-	return bestPhone;
+  for (let i = 1; i < phones.length; i++) {
+    const phone = phones[i]!;
+    let rank = NUCLEUS_PRIORITY.indexOf(phone);
+    if (rank === -1) rank = 999;
+    if (rank < bestRank) {
+      bestRank = rank;
+      bestPhone = phone;
+    }
+  }
+  return bestPhone;
 }
-

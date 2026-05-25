@@ -12,7 +12,6 @@ import { classifyPhone } from "./phoneme.ts";
 import { DEFAULT_VIETNAMESE_METADATA } from "./vietnamese-metadata.ts";
 import { isFixedOnset } from "../onset.ts";
 
-
 export class CumulativeFloatTimingStrategy implements TimingStrategy {
   toPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {
     const events: PhoneEvent[] = [];
@@ -222,7 +221,9 @@ function assignPhoneWindows(
 
   let tailDur = 0;
   for (const item of tail) {
-    const isConsonantCoda = ["m", "n", "ng", "nh", "p", "t", "c", "ch", "N", "cl", "g"].includes(item.phone);
+    const isConsonantCoda = ["m", "n", "ng", "nh", "p", "t", "c", "ch", "N", "cl", "g"].includes(
+      item.phone,
+    );
     if (isConsonantCoda) {
       tailDur += 350_000; // 35ms fixed duration
     } else {

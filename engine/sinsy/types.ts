@@ -1,4 +1,4 @@
-export type PhoneClass = "v" | "c" | "p";
+export type PhoneClass = "s" | "p" | "v" | "c" | "b";
 export type PhoneRole = "pre" | "anchor" | "tail" | "breath";
 export type NucleusClass = "none" | "single" | "diphthong" | "triphthong";
 export type CodaClass = "none" | "glide" | "nasal" | "stop";

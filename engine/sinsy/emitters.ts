@@ -143,7 +143,7 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     const e = fill(60);
     e[0] = pitch;
     e[1] = String(note.pitch?.pitchClass ?? 0);
-    e[2] = String(expression.pitchDeltaFromPrev);
+    e[2] = "0";
     e[3] = beat;
     e[4] = tempo;
     e[5] = "1";
@@ -159,8 +159,8 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     e[40] =
       expression.pitchDeltaFromPrev < 0 ? String(Math.abs(expression.pitchDeltaFromPrev)) : "0";
     e[41] = expression.pitchDeltaToNext > 0 ? String(expression.pitchDeltaToNext) : "0";
-    e[48] = String(expression.pitchDeltaFromPrev);
-    e[49] = String(expression.pitchDeltaToNext);
+    e[56] = formatPitchDiff(expression.pitchDeltaFromPrev);
+    e[57] = formatPitchDiff(expression.pitchDeltaToNext);
     e[58] = "0";
     e[59] = note.hasBreath ? "1" : "0";
 
@@ -230,4 +230,11 @@ function durationCentiseconds(event: ScoreNote): string {
   return String(
     clamp(Math.floor((event.durationDiv / event.divisions) * (60 / event.tempo) * 100), 499),
   );
+}
+
+function formatPitchDiff(value: number): string {
+  if (value < 0) {
+    return `m${Math.abs(value)}`;
+  }
+  return `p${value}`;
 }

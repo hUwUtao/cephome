@@ -666,3 +666,41 @@ test("stub passes MusicXML bytes to rule API", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("classifyPhone correctly maps all 5 Sinsy types", () => {
+  const { classifyPhone } = require("./phoneme.ts");
+  expect(classifyPhone("sil")).toBe("s");
+  expect(classifyPhone("pau")).toBe("p");
+  expect(classifyPhone("br")).toBe("b");
+  expect(classifyPhone("a")).toBe("v");
+  expect(classifyPhone("i")).toBe("v");
+  expect(classifyPhone("k")).toBe("c");
+  expect(classifyPhone("t")).toBe("c");
+});
+
+test("HTS label emitter output contains correct key and formatted pitch diff", () => {
+  const result = new SinsyLabelPipeline().serialize(SIMPLE_XML);
+  // Key should be e3 = 0 (separated by ^0)
+  expect(result.full).toContain("]0^0=");
+  // Pitch diffs should be pN or mN at indices 56 and 57 (separated by ~pN~mN/etc.)
+  // Let's assert on the separator pattern near the end of E line
+  // e.g. E line should have "~p0~p0" or similar at the end before F block
+  // Let's check for /E: prefix and ensure the pitch diffs are prefixed with p or m
+  const lines = result.full.split("\n");
+  const eLine = lines.find((line) => line.includes("/E:"));
+  expect(eLine).toBeDefined();
+
+  // Format should end with: ~[p|m]N~[p|m]N before the /F: block or F separator
+  // In emitters.ts:
+  // e[56] = formatPitchDiff(expression.pitchDeltaFromPrev);
+  // e[57] = formatPitchDiff(expression.pitchDeltaToNext);
+  // e[58] = "0"
+  // e[59] = note.hasBreath ? "1" : "0"
+  // E_SEP[56] is "~"
+  // E_SEP[57] is "+"
+  // E_SEP[58] is "!"
+  // E_SEP[59] is "^"
+  // Followed by /F: block
+  // So it will look like: ~[pm]\d+[pm]\d+!0^[01]/F:
+  expect(eLine).toMatch(/~[pm]\d+\+[pm]\d+!0\^[01]\/F:/);
+});
