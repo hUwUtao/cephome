@@ -1,4 +1,4 @@
-import { codaToPhonemes, nucleusToPhonemes } from "../van.ts";
+import { codaToPhonemes, nucleusToPhonemes, getDominantVowelPhone } from "../van.ts";
 import { onsetToPhonemes } from "../onset.ts";
 import { segmentSyllable } from "../segment.ts";
 import type { RoleAwareLyricTranspiler, SyllablePhonePlan, TimedPhonePlan } from "./types.ts";
@@ -45,12 +45,22 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
       // ă and â are inherently short vowels
       const isShortVowel = ["ă", "â"].includes(parsed.nucleus);
       const vowelWeight = isShortVowel ? 0.5 : 1.0;
-      nucleus.forEach((phone, index) => {
-        plan.push({
-          phone,
-          role: index === 0 ? "anchor" : "tail",
-          weight: (index === 0 ? 1 : 0.7) * vowelWeight,
-        });
+      const dominantPhone = getDominantVowelPhone(nucleus);
+      nucleus.forEach((phone) => {
+        if (phone === dominantPhone) {
+          plan.push({
+            phone,
+            role: "anchor",
+            weight: 1.0 * vowelWeight,
+          });
+        } else {
+          plan.push({
+            phone,
+            role: "anchor",
+            weight: 0.05,
+            ghost: true,
+          });
+        }
       });
 
       for (const phone of codaPhones(parsed.coda, parsed.tone, this.mode)) {

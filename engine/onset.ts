@@ -34,10 +34,19 @@ const ONSET_MAP: Record<string, string[]> = {
   "": [],
 };
 
-export function onsetToPhonemes(onset: string): string[] {
-  const result = ONSET_MAP[onset];
-  if (result === undefined) {
-    throw new Error(`Unknown onset: "${onset}"`);
-  }
-  return result;
+export const RECOGNIZED_ONSETS = new Set([
+	"b", "c", "ch", "d", "đ", "g", "gh", "h", "k", "kh", "l", "m", "n", "ng", "ngh", "nh", "p", "ph", "q", "r", "s", "t", "th", "tr", "v", "x", "z", "f", "ny", "ty"
+]);
+
+export function isFixedOnset(phone: string): boolean {
+	return RECOGNIZED_ONSETS.has(phone) || phone === "cl";
 }
+
+export function onsetToPhonemes(onset: string): string[] {
+	const result = ONSET_MAP[onset];
+	if (result === undefined) {
+		throw new Error(`Unknown onset: "${onset}"`);
+	}
+	return result;
+}
+

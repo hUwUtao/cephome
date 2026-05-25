@@ -10,6 +10,8 @@ import type {
 } from "./types.ts";
 import { classifyPhone } from "./phoneme.ts";
 import { DEFAULT_VIETNAMESE_METADATA } from "./vietnamese-metadata.ts";
+import { isFixedOnset } from "../onset.ts";
+
 
 export class CumulativeFloatTimingStrategy implements TimingStrategy {
   toPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {
@@ -209,13 +211,25 @@ function assignPhoneWindows(
     return splitWindow(plan, start, end, options);
   }
 
-  let preDur =
-    pre.length > 0 ? Math.min(total * options.preRatio, options.maxPreSeconds * 10_000_000) : 0;
-  if (pre.length > 0 && pre.every((item) => item.phone === "w")) {
-    preDur *= Math.max(...pre.map((item) => item.weight));
+  let preDur = 0;
+  for (const item of pre) {
+    if (isFixedOnset(item.phone)) {
+      preDur += 400_000; // 40ms fixed duration
+    } else {
+      preDur += 200_000; // 20ms default
+    }
   }
-  let tailDur =
-    tail.length > 0 ? Math.min(total * options.tailRatio, options.maxTailSeconds * 10_000_000) : 0;
+
+  let tailDur = 0;
+  for (const item of tail) {
+    const isConsonantCoda = ["m", "n", "ng", "nh", "p", "t", "c", "ch", "N", "cl", "g"].includes(item.phone);
+    if (isConsonantCoda) {
+      tailDur += 350_000; // 35ms fixed duration
+    } else {
+      tailDur += 250_000; // 25ms default
+    }
+  }
+
   const nonAnchorLimit = total * options.maxNonAnchorRatio;
   if (preDur + tailDur > nonAnchorLimit) {
     const scale = nonAnchorLimit / (preDur + tailDur);

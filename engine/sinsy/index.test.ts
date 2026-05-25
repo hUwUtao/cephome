@@ -320,9 +320,9 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   expect(mono).toBe(
     [
       "0 400000 k",
-      "400000 4800000 i",
-      "4800000 5360000 e",
-      "5360000 6000000 N",
+      "400000 550000 i",
+      "550000 5650000 e",
+      "5650000 6000000 N",
       "6000000 12000000 pau",
       "",
     ].join("\n"),
