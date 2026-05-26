@@ -33,6 +33,7 @@ interface ParseState {
   tempo: number;
   beat: ScoreBeat;
   dynamic: string;
+  expression: string | null;
 }
 
 export class DomMusicXmlParser implements MusicXmlParser {
@@ -61,6 +62,7 @@ export class DomMusicXmlParser implements MusicXmlParser {
       tempo: 120,
       beat: { beats: 4, beatType: 4 },
       dynamic: "mf",
+      expression: null,
     };
     let cursorDiv = 0;
     let lastNoteStartDiv = 0;
@@ -77,10 +79,19 @@ export class DomMusicXmlParser implements MusicXmlParser {
           case "sound":
             state.tempo = numberAttr(child, "tempo") ?? state.tempo;
             break;
-          case "direction":
+          case "direction": {
             state.tempo = directionTempo(child) ?? state.tempo;
             state.dynamic = directionDynamic(child) ?? state.dynamic;
+            const expr = directionExpression(child);
+            if (expr !== null) {
+              if (expr.toLowerCase() === "normal" || expr.toLowerCase() === "reset") {
+                state.expression = null;
+              } else {
+                state.expression = expr;
+              }
+            }
             break;
+          }
           case "backup":
             cursorDiv -= durationOf(child);
             break;
@@ -172,6 +183,7 @@ export class DomMusicXmlParser implements MusicXmlParser {
       dynamic: meta.state.dynamic,
       hasAccent: first(note, "accent") !== null || first(note, "strong-accent") !== null,
       hasStaccato: first(note, "staccato") !== null,
+      expression: meta.state.expression,
     };
   }
 }
@@ -231,6 +243,11 @@ function directionDynamic(direction: XmlElement): string | null {
   if (!dynamics) return null;
   const child = directElementChildren(dynamics)[0];
   return child ? tagName(child) : null;
+}
+
+function directionExpression(direction: XmlElement): string | null {
+  const words = first(direction, "words");
+  return words ? textOf(words) : null;
 }
 
 function durationOf(parent: XmlElement): number {

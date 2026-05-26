@@ -38,32 +38,103 @@ export function expressionForNote(
     vibratoStartRatio: vibratoEnabled ? 0.35 : 0,
     pitchDeltaFromPrev: pitchDelta(previousNote, note),
     pitchDeltaToNext: pitchDelta(note, nextNote),
-    tonalPitchOffset: calculateTonalOffset(tone, phoneIndex, phoneCount),
+    tonalPitchOffset: calculateTonalOffset(
+      tone,
+      phoneIndex,
+      phoneCount,
+      note.dynamic,
+      note.expression,
+    ),
     toneMelodyRelation: calculateToneMelodyRelation(tone, pitchDelta(note, nextNote)),
   };
+}
+
+function dynamicScaleFactor(dynamic: string): number {
+  switch (dynamic) {
+    case "pppp":
+      return 0.2;
+    case "ppp":
+      return 0.4;
+    case "pp":
+      return 0.6;
+    case "p":
+      return 0.8;
+    case "mp":
+      return 0.95;
+    case "mf":
+      return 1.0;
+    case "f":
+      return 1.1;
+    case "ff":
+      return 1.25;
+    case "fff":
+      return 1.4;
+    case "ffff":
+      return 1.6;
+    default:
+      return 1.0;
+  }
 }
 
 /**
  * Calculate microtonal pitch offset (in semitones) for a given tone and phone position.
  */
-function calculateTonalOffset(tone: number, index: number, count: number): number {
+function calculateTonalOffset(
+  tone: number,
+  index: number,
+  count: number,
+  dynamic: string = "mf",
+  expression: string | null = null,
+): number {
   if (count <= 1) return 0;
   const ratio = index / (count - 1);
+  let offset = 0;
 
   switch (tone) {
     case 1: // Huyền (Low falling)
-      return -0.5 * ratio;
+      offset = -0.5 * ratio;
+      break;
     case 2: // Sắc (High rising)
-      return 0.6 * ratio;
+      offset = 0.6 * ratio;
+      break;
     case 3: // Hỏi (Dipping)
-      return ratio < 0.5 ? -0.4 * (ratio * 2) : -0.4 + 0.4 * ((ratio - 0.5) * 2);
+      offset = ratio < 0.5 ? -0.4 * (ratio * 2) : -0.4 + 0.4 * ((ratio - 0.5) * 2);
+      break;
     case 4: // Ngã (Rising + glottal)
-      return 0.8 * ratio;
+      offset = 0.8 * ratio;
+      break;
     case 5: // Nặng (Falling + sharp)
-      return -0.7 * ratio;
+      offset = -0.7 * ratio;
+      break;
     default:
-      return 0;
+      offset = 0;
   }
+
+  // Feature 2: "Smooth" Tone-Decimator / Tune Value
+  const isSmooth = expression?.toLowerCase().includes("smooth");
+
+  // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
+  const scale = dynamicScaleFactor(dynamic);
+  offset *= scale;
+
+  // Head/Tail assists (Attack overshoot / release decay)
+  const isLoud = ["f", "ff", "fff", "ffff"].includes(dynamic);
+  const isSoft = ["p", "pp", "ppp", "pppp"].includes(dynamic);
+  if (index === 0) {
+    // Head (Attack)
+    if (isLoud) {
+      offset += 0.25 * (dynamic === "ffff" ? 1.6 : 1.0); // sharp attack overshoot
+    } else if (isSoft) {
+      offset -= 0.15 * (dynamic === "pppp" ? 1.6 : 1.0); // soft scoop
+    }
+  } else if (index === count - 1) {
+    // Tail (Decay)
+    if (isSoft) {
+      offset -= 0.35 * (dynamic === "pppp" ? 1.8 : 1.0); // deeper release decay fall
+    }
+  }
+
+  return offset;
 }
 
 function calculateToneMelodyRelation(tone: number, nextDelta: number): ToneMelodyRelation {

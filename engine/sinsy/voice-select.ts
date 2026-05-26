@@ -1,4 +1,5 @@
 import { canonicalizeVietnamese, extractTone } from "../normalize.ts";
+import { segmentSyllable } from "../segment.ts";
 import type { ScoreDocument, ScoreNormalizer, ScoreNote } from "./types.ts";
 
 export interface VocalLineNormalizerOptions {
@@ -29,9 +30,10 @@ export class VocalLineNormalizer implements ScoreNormalizer {
     const joinedSyllables = this.joinSyllabicLyric(withoutChordClutter);
     const withTies = this.mergeTies(joinedSyllables);
     const withSlurCarry = this.markSlurContinuations(withTies);
+    const withWordWindowExpansion = this.applyWordWindowExpansion(withSlurCarry);
     return {
       ...score,
-      notes: withSlurCarry,
+      notes: withWordWindowExpansion,
     };
   }
 
@@ -187,6 +189,65 @@ export class VocalLineNormalizer implements ScoreNormalizer {
       out.push(note);
     }
 
+    return out;
+  }
+
+  private applyWordWindowExpansion(notes: ScoreNote[]): ScoreNote[] {
+    const out = [...notes];
+    for (let i = 0; i < out.length; i++) {
+      const note = out[i]!;
+      if (note.lyric && !note.isRest && (note.slur === "start" || note.tie === "start")) {
+        // Find the chain of slurred/tied notes
+        let chainEndIndex = i;
+        for (let j = i + 1; j < out.length; j++) {
+          const nextNote = out[j]!;
+          if (nextNote.isRest || nextNote.lyric) {
+            break;
+          }
+          if (nextNote.carriedPhones) {
+            chainEndIndex = j;
+          }
+          // If we hit the stop of the slur/tie
+          if (nextNote.slur === "stop" || nextNote.tie === "stop") {
+            chainEndIndex = j;
+            break;
+          }
+        }
+
+        if (chainEndIndex > i) {
+          try {
+            const parsed = segmentSyllable(note.lyric);
+            if (parsed.coda) {
+              const coda = parsed.coda;
+              // Only strip true consonant codas (nasal/stop).
+              // Glide codas (i, u, o, y) are part of the diphthong nucleus
+              // and must travel with the vowel — never strip them.
+              const isGlideCoda = ["i", "u", "o", "y"].includes(coda.toLowerCase());
+              if (!isGlideCoda) {
+                const suffix = note.lyric.slice(-coda.length);
+                if (suffix.toLowerCase() === coda.toLowerCase()) {
+                  // 1. Strip coda from the starting note's lyric
+                  const startNote = { ...note };
+                  startNote.lyric = note.lyric.slice(0, -coda.length);
+                  out[i] = startNote;
+
+                  // 2. Append coda to the carriedPhones of the end note
+                  const endNote = { ...out[chainEndIndex]! };
+                  if (endNote.carriedPhones) {
+                    endNote.carriedPhones = [...endNote.carriedPhones, coda];
+                  } else {
+                    endNote.carriedPhones = [coda];
+                  }
+                  out[chainEndIndex] = endNote;
+                }
+              }
+            }
+          } catch (e) {
+            // Syllable parsing failed, skip expansion gracefully
+          }
+        }
+      }
+    }
     return out;
   }
 }

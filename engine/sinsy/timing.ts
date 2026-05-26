@@ -139,7 +139,9 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       });
     }
 
-    return collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options));
+    return applyVowelDecimationSplit(
+      collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+    );
   }
 }
 
@@ -260,8 +262,16 @@ function applyBoundaryPrefire(
 
     if (previousNote.isRest || currentNote.isRest || currentNote.hasBreath) continue;
 
+    const previousLast = previous[previous.length - 1]!;
+
     const preEvents = current.filter((event) => event.role === "pre");
-    if (preEvents.length === 0) continue;
+    if (preEvents.length === 0) {
+      const firstEvent = current[0]!;
+      if (previousLast.end < firstEvent.start) {
+        firstEvent.start = previousLast.end;
+      }
+      continue;
+    }
 
     const boundary = current[0]!.start;
     const preDuration = sumDurations(preEvents);
@@ -276,7 +286,6 @@ function applyBoundaryPrefire(
 
     if (prefire <= 0) continue;
 
-    const previousLast = previous[previous.length - 1]!;
     const previousLastDuration = previousLast.end - previousLast.start;
     const protection = Math.min(previousLastDuration * 0.4, 200_000);
     const safePrefire = Math.floor(
@@ -368,6 +377,98 @@ function renumberPhoneIndexes(events: PhoneEvent[]): PhoneEvent[] {
 
 function sumDurations(events: Array<{ start: number; end: number; role: PhoneRole }>): number {
   return events.reduce((sum, event) => sum + Math.max(0, event.end - event.start), 0);
+}
+
+/**
+ * Ease-in-out cubic interpolation (Hermite).
+ * t=0 → 0, t=1 → 1, smooth S-curve.
+ */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+/**
+ * Feature 2 – Vowel Decimation Split for Slur Swinginess.
+ *
+ * When a vowel anchor belongs to a slur-start note that transitions to a
+ * different pitch on the slur target, split the vowel into three contiguous
+ * sub-segments:
+ *   [head] [transition (25 ms)] [tail]
+ *
+ * The middle "transition" segment carries `decimationEase: 0.5` — the
+ * ease-in-out cubic midpoint — so the HTS engine receives a clear intermediate
+ * pitch guide for the portamento swing rather than having to guess a linear
+ * ramp. This controls the vibrato onset and the slur pitch-glide shape.
+ *
+ * Only slur-start notes are split (not every pitch change) so that ordinary
+ * melody steps remain unaffected.
+ * Guard: the vowel event must be ≥ 75 ms to leave room for the two 25 ms
+ * tail segments.
+ */
+const DECIMATION_SEGMENT_TICKS = 250_000; // 25 ms
+const DECIMATION_MIN_TICKS = 750_000; // need ≥ 75 ms for a clean 3-way split
+
+function applyVowelDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
+  // Build a fast lookup: note id → next distinct pitched note (the slur target)
+  const noteOrder: ScoreNote[] = [];
+  const seenIds = new Set<string>();
+  for (const ev of events) {
+    if (!seenIds.has(ev.note.id)) {
+      seenIds.add(ev.note.id);
+      noteOrder.push(ev.note);
+    }
+  }
+  const nextPitchedNote = new Map<string, ScoreNote | null>();
+  for (let i = 0; i < noteOrder.length; i++) {
+    const note = noteOrder[i]!;
+    let next: ScoreNote | null = null;
+    for (let j = i + 1; j < noteOrder.length; j++) {
+      if (!noteOrder[j]!.isRest && noteOrder[j]!.pitch) {
+        next = noteOrder[j]!;
+        break;
+      }
+    }
+    nextPitchedNote.set(note.id, next);
+  }
+
+  const out: PhoneEvent[] = [];
+  for (const event of events) {
+    // Only target slur-start anchor vowels with enough duration
+    if (
+      event.cls !== "v" ||
+      event.role !== "anchor" ||
+      event.ghost ||
+      event.note.isRest ||
+      !event.note.pitch ||
+      event.note.slur !== "start"
+    ) {
+      out.push(event);
+      continue;
+    }
+
+    const nextNote = nextPitchedNote.get(event.note.id) ?? null;
+    const pitchDelta = nextNote?.pitch ? nextNote.pitch.midi - event.note.pitch.midi : 0;
+    const duration = event.end - event.start;
+
+    // Only split when the slur actually changes pitch AND there is enough room
+    if (pitchDelta === 0 || duration < DECIMATION_MIN_TICKS) {
+      out.push(event);
+      continue;
+    }
+
+    // Three-way split: head / transition / tail
+    const transStart = event.end - DECIMATION_SEGMENT_TICKS * 2;
+    const transEnd = event.end - DECIMATION_SEGMENT_TICKS;
+
+    // Head segment — stays at the slur-start note's pitch
+    out.push({ ...event, end: transStart });
+    // Transition (middle) segment — ease-in-out midpoint pitch between the two notes
+    out.push({ ...event, start: transStart, end: transEnd, decimationEase: easeInOutCubic(0.5) });
+    // Tail segment — last moment still at start pitch, engine begins the ramp here
+    out.push({ ...event, start: transEnd });
+  }
+
+  return renumberPhoneIndexes(out);
 }
 
 function splitWindow(

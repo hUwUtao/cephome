@@ -1,0 +1,100 @@
+# cephome pronunciation dictionary v1
+# Format: word pre | nucleus | tail
+# [] marks ghost/compressed phones. Run with --omit-ghost to drop bracketed phones.
+# !N sets velocity. Tailing / \ ? ~ . is accepted as a tone hint.
+# Example: khiên k h | i [w] e | n
+
+# [1] Nào bạn lại đây ngắt lá xếp thuyền
+Nào n | a o |
+bạn b | a | N cl
+lại r | a i | cl
+đây d | a i |
+ngắt n g | a | t
+lá r | a |
+xếp s | e | p
+thuyền t h | u e | y N
+
+# [2] Thả dòng ngược xuôi đi đến bao miền
+Thả t h | a |
+dòng z | o | N g
+ngược n g | u o | k
+xuôi s w | o i |
+đi d | i |
+đến d | e | N
+bao b | a o |
+miền m | i e | N
+
+# [3] Bạn bè cùng vui theo những lá thuyền
+bè b | e |
+cùng k | u | N g
+vui v | u i |
+theo t h | e o |
+những ny | u | N g cl
+
+# [4] Thuyền chở về đâu những giấc mơ hiền
+chở ch | o |
+về v | e |
+đâu d | o u |
+giấc z | a | k
+mơ m | o |
+hiền h | i e | N
+
+# [5] Này màu xanh lam hay lá nâu lành
+Này n | a i |
+màu m | a u |
+xanh s | a | N
+lam r | a | N
+hay h | a i |
+nâu n | o u |
+lành r | a | N
+
+# [6] Là thuyền của em em quý vô ngần
+Là r | a |
+của k | u o |
+em  | e | N
+quý k w | i |
+vô v | o |
+ngần n g | a | N
+
+# [7] Bạn bè của em ở khắp bao miền
+ở  | o |
+khắp k | a | p
+
+# [8] Nào vì màu da cách xa nhau
+vì v | i |
+da z | a |
+cách k | a | k
+xa s | a |
+nhau ny | a u |
+
+# [9] Dập dờn sóng nước thuyền đầy gió nắng
+Dập z | a | p
+dờn z | o | N
+sóng s | o | N g
+nước n | u o | k
+đầy d | a i |
+gió z | o |
+nắng n | a | N g
+
+# [10] Sóng vui ra khơi đón ông mặt trời
+ra z | a |
+khơi k | o i |
+đón d | o | N
+ông  | o | N g
+mặt m | a | t
+trời ty z | o i |
+
+# [11] Đẹp màu mắt sáng tràn đầy ước muốn
+Đẹp d | e | p
+mắt m | a | t
+sáng s | a | N g
+tràn ty z | a | N
+ước  | u o | k
+muốn m | u o | N
+
+# [12] Biết bao yêu thương đón em vào đời
+Biết b | i e | t
+yêu  | i e u |
+thương t h | u o | N g
+vào v | a o |
+đời d | o i |

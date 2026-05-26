@@ -6,6 +6,8 @@ import { flatTtsToLabel, parseTextToScore } from "./flat-tts.ts";
 import type { SinsySerializationTrace } from "./index.ts";
 import type { PhoneEvent, ScoreNote } from "./types.ts";
 
+import { generateTimelineSvg } from "./timeline-svg.ts";
+
 function isXml(content: string): boolean {
   const trimmed = content.trim();
   return (
@@ -98,8 +100,14 @@ export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promis
   writeFileSync(fullLabelPath, result.full, "utf8");
   writeFileSync(monoLabelPath, result.mono, "utf8");
 
+  const svgPath = monoLabelPath.endsWith(".lab")
+    ? monoLabelPath.slice(0, -4) + ".timeline.svg"
+    : monoLabelPath + ".timeline.svg";
+  writeFileSync(svgPath, generateTimelineSvg(result.events), "utf8");
+
   console.error(`output full label -> ${fullLabelPath}`);
   console.error(`output mono label -> ${monoLabelPath}`);
+  console.error(`output timeline SVG -> ${svgPath}`);
 }
 
 function runMusicXmlToLabelCore(
@@ -161,8 +169,14 @@ function runMusicXmlToLabelCore(
   writeFileSync(fullLabelPath, result.full, "utf8");
   writeFileSync(monoLabelPath, result.mono, "utf8");
 
+  const svgPath = monoLabelPath.endsWith(".lab")
+    ? monoLabelPath.slice(0, -4) + ".timeline.svg"
+    : monoLabelPath + ".timeline.svg";
+  writeFileSync(svgPath, generateTimelineSvg(result.events), "utf8");
+
   console.error(`output full label -> ${fullLabelPath}`);
   console.error(`output mono label -> ${monoLabelPath}`);
+  console.error(`output timeline SVG -> ${svgPath}`);
 }
 
 function buildDiagnosticReport(result: SinsySerializationTrace): string {

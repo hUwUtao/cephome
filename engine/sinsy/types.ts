@@ -59,6 +59,7 @@ export interface ScoreNote {
   dynamic: string;
   hasAccent: boolean;
   hasStaccato: boolean;
+  expression: string | null;
 }
 
 export interface ScoreDocument {
@@ -106,6 +107,8 @@ export interface PhoneEvent {
   velocity?: number;
   phoneIndexInNote: number;
   phoneCountInNote: number;
+  /** Ease-in-out ratio (0..1) for the middle segment of a 3-way vowel decimation split. */
+  decimationEase?: number;
 }
 
 export interface ExpressionGauge {
