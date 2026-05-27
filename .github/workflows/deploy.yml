@@ -34,6 +34,9 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Regen examples
+        run: bun run regen:example
+
       - name: Build
         run: bun run build
 

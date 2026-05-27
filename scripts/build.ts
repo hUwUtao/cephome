@@ -88,4 +88,17 @@ copyFileSync("./bin/musicXMLtoLabel.exe", "./dist/musicXMLtoLabel.exe");
 copyFileSync("./bin/cephome-player.exe", "./dist/cephome-player.exe");
 copyFileSync("./bin/rule.js", "./dist/rule.js");
 
+console.log("Copying example players to dist/...");
+copyFileSync(
+  "./example/lathuyenuocmo.musicxml.player.html",
+  "./dist/lathuyenuocmo.musicxml.player.html",
+);
+copyFileSync(
+  "./example/emlamamnoncuadang.musicxml.player.html",
+  "./dist/emlamamnoncuadang.musicxml.player.html",
+);
+if (existsSync("./example/emlamamnoncuadang.opus")) {
+  copyFileSync("./example/emlamamnoncuadang.opus", "./dist/emlamamnoncuadang.opus");
+}
+
 console.log("Build completed successfully!");

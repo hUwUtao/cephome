@@ -167,7 +167,16 @@ export async function transcribeWithOverrides(
     if (!noPlayer) {
       const playerPath = `${sourceName}.player.html`;
       try {
-        const playerHtml = await generateInteractivePlayerHtml(svgContent, sourceName);
+        const { existsSync } = await import("node:fs");
+        const baseWithoutExt = sourceName.substring(0, sourceName.lastIndexOf("."));
+        let audioUrl: string | undefined;
+        for (const ext of [".opus", ".wav", ".mp3", ".ogg", ".WAV", ".OPUS"]) {
+          if (existsSync(baseWithoutExt + ext)) {
+            audioUrl = baseWithoutExt.split(/[/\\]/).pop() + ext;
+            break;
+          }
+        }
+        const playerHtml = await generateInteractivePlayerHtml(svgContent, sourceName, audioUrl);
         writeFileSync(playerPath, playerHtml, "utf8");
         if (!quiet) console.error(`output player HTML -> ${playerPath}`);
       } catch (e) {

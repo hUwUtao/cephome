@@ -300,7 +300,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
           // Draw a beautiful dashed/dotted purple bridge at the BOTTOM edge of adjacent notes
           musicalConnections.push(`
 					<!-- Tie from ${note.lyric || "unnamed"} to ${nextNote.lyric || "unnamed"} -->
-					<path d="M ${curr.x2} ${curr.y + barHeight / 2} Q ${(curr.x2 + next.x1) / 2} ${curr.y + barHeight / 2 + 12} ${next.x1} ${next.y + barHeight / 2}" 
+					<path d="M ${curr.x2} ${curr.y + barHeight / 2} Q ${(curr.x2 + next.x1) / 2} ${curr.y + barHeight / 2 + 12} ${next.x1} ${next.y + barHeight / 2}"
 						fill="none" stroke="#d946ef" stroke-width="2" stroke-dasharray="3 2" opacity="0.8" />
 					`);
         }
@@ -330,10 +330,10 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
         // large-arc-flag = 1, sweep-flag = 0 to always draw the deep lower half of the circle (underswing)
         musicalConnections.push(`
 				<!-- CeVIO Style Slur Arc UNDER the notes -->
-				<path d="M ${x1} ${y1} A ${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${x2} ${y2}" 
+				<path d="M ${x1} ${y1} A ${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${x2} ${y2}"
 					fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
 				<!-- Tiny musical slur curve accent (drawn under the arc peak) -->
-				<path d="M ${(x1 + x2) / 2 - 8} ${Math.max(y1, y2) + depth - 8} Q ${(x1 + x2) / 2} ${Math.max(y1, y2) + depth - 12} ${(x1 + x2) / 2 + 8} ${Math.max(y1, y2) + depth - 8}" 
+				<path d="M ${(x1 + x2) / 2 - 8} ${Math.max(y1, y2) + depth - 8} Q ${(x1 + x2) / 2} ${Math.max(y1, y2) + depth - 12} ${(x1 + x2) / 2 + 8} ${Math.max(y1, y2) + depth - 8}"
 					fill="none" stroke="#818cf8" stroke-width="1" opacity="0.5" />
 				`);
       }
@@ -354,7 +354,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
     else if (event.role === "breath") bandColor = "#475569";
 
     phoneVerticalLines.push(`
-		<line x1="${x1}" y1="${paddingTop}" x2="${x1}" y2="${height - paddingBottom}" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="2 2" />
+		<line x1="${x1}" y1="${paddingTop}" x2="${x1}" y2="${height - paddingBottom}" stroke="#cbd5e1" stroke-width="0.8" />
 		`);
 
     phoneLabels.push(`
@@ -366,7 +366,12 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
   });
 
   // 6. Continuous F0 line (flat-stepped per segment, with decimation transition guide)
-  const f0Points: Array<{ x: number; y: number; isSilence: boolean; isDecimation: boolean }> = [];
+  const f0Points: Array<{
+    x: number;
+    y: number;
+    isSilence: boolean;
+    isDecimation: boolean;
+  }> = [];
   // Pre-compute next pitched MIDI per note for decimation interpolation
   const noteOrderSvg: (typeof events)[0]["note"][] = [];
   const seenSvg = new Set<string>();
@@ -417,10 +422,20 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
       const yVal = getY(actualPitch);
 
       f0Points.push({ x: x1, y: yVal, isSilence: false, isDecimation });
-      f0Points.push({ x: (x1 + x2) / 2, y: yVal, isSilence: false, isDecimation });
+      f0Points.push({
+        x: (x1 + x2) / 2,
+        y: yVal,
+        isSilence: false,
+        isDecimation,
+      });
       f0Points.push({ x: x2, y: yVal, isSilence: false, isDecimation });
     } else {
-      f0Points.push({ x: (x1 + x2) / 2, y: 0, isSilence: true, isDecimation: false });
+      f0Points.push({
+        x: (x1 + x2) / 2,
+        y: 0,
+        isSilence: true,
+        isDecimation: false,
+      });
     }
   });
 
@@ -438,12 +453,6 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
         }
       } else {
         currentSegment.push({ x: pt.x, y: pt.y });
-        // Draw small accent marker for decimation transition guide points
-        if (pt.isDecimation) {
-          decimationMarkers.push(
-            `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4" fill="#f59e0b" stroke="#d97706" stroke-width="1.2" opacity="0.9" />`,
-          );
-        }
       }
     }
     if (currentSegment.length > 0) {
@@ -453,8 +462,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
     f0PathSvg = paths
       .map(
         (d) => `
-		<path d="${d}" fill="none" stroke="#38bdf8" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.6" />
-		<path d="${d}" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.75" />
+		<path d="${d}" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 		`,
       )
       .join("\n");
@@ -473,16 +481,16 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 		`);
   }
 
-  return `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="100%" data-total-duration="${(totalTime / 10_000_000).toFixed(4)}">
+  const svgContent = `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" data-total-duration="${(totalTime / 10_000_000).toFixed(4)}">
 	<style>
 		text { user-select: none; }
-		.phone-event { transition: transform 0.1s ease; cursor: pointer; }
+		.phone-event { transition: transform 0.1s ease; cursor: pointer; will-change: transform; }
 		.phone-event:hover rect { fill-opacity: 0.3; }
 		.phone-event.active rect { fill-opacity: 0.5; stroke-opacity: 1; stroke-width: 2; }
-		.note-block { transition: filter 0.2s ease; }
+		.note-block { transition: filter 0.2s ease; will-change: filter; }
 		.note-block.active { filter: drop-shadow(0 0 4px #db2777); }
-		#cursor { transition: x1 0.05s linear, x2 0.05s linear; pointer-events: none; }
-		#piano-head { transform: translateX(var(--scroll-x, 0)); will-change: transform; }
+		#cursor { transition: x1 0.05s linear, x2 0.05s linear; pointer-events: none; will-change: x1, x2; }
+		#piano-head { will-change: transform; }
 	</style>
 	<!-- Pure White background (W3C Compliant & Light Mode) -->
 	<rect width="100%" height="100%" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
@@ -504,10 +512,6 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 
 	<!-- Continuous Semi-transparent F0 Line -->
 	${f0PathSvg}
-
-	<!-- Decimation Transition Guide Dots (amber) -->
-	${decimationMarkers.join("\n")}
-
 	<!-- Active MIDI Note Lyric Texts -->
 	${noteTexts.join("")}
 
@@ -528,6 +532,25 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 	<!-- Interactive Cursor -->
 	<line id="cursor" x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="#ef4444" stroke-width="2" opacity="0.8" />
 </svg>`;
+
+  return minifySvg(svgContent);
+}
+
+function minifySvg(svg: string): string {
+  let minified = svg
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/>\s+</g, "><")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // Custom high-performance SVGO precision optimizer mimicking step
+  // Rounds floating numbers in attributes/paths to 3 decimal places to preserve high fidelity curves
+  minified = minified.replace(/(\d+\.\d{4,})/g, (val) => {
+    const num = parseFloat(val);
+    return isNaN(num) ? val : num.toFixed(3).replace(/\.0{1,3}$/, "");
+  });
+
+  return minified;
 }
 
 /**

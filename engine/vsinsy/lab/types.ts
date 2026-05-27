@@ -60,7 +60,7 @@ export interface ScoreNote {
   dynamic: string;
   hasAccent: boolean;
   hasStaccato: boolean;
-  expression: string | null;
+  expression?: string | null;
 }
 
 export interface ScoreDocument {

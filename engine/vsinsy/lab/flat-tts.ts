@@ -63,7 +63,7 @@ export function parseTextToScore(text: string, options: FlatTtsOptions = {}): Sc
     const line = lines[lineIdx]!;
     const tokenRegex =
       /[\u0300-\u036fa-zA-Zàáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệđìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+|[.,!;?]/gi;
-    let match;
+    let match: RegExpExecArray | null;
     const tokens: string[] = [];
     while ((match = tokenRegex.exec(line)) !== null) {
       tokens.push(match[0]!);
@@ -211,8 +211,13 @@ export function flatTtsToLabel(
       const neededForConsonants = consonants.length * consonantDuration;
       const neededForVowels = vowels.length * minVowelDuration;
 
-      if (neededForConsonants + neededForVowels > totalDuration) {
-        const equalShare = Math.floor(totalDuration / phones.length);
+      if (vowels.length === 0) {
+        const equalShare =
+          phones.length > 0 ? Math.floor(totalDuration / phones.length) : totalDuration;
+        finalDurations = phones.map(() => equalShare);
+      } else if (neededForConsonants + neededForVowels > totalDuration) {
+        const equalShare =
+          phones.length > 0 ? Math.floor(totalDuration / phones.length) : totalDuration;
         finalDurations = phones.map(() => equalShare);
       } else {
         const remaining = totalDuration - neededForConsonants;
@@ -224,16 +229,34 @@ export function flatTtsToLabel(
 
       const sum = finalDurations.reduce((s, d) => s + d, 0);
       if (finalDurations.length > 0) {
-        finalDurations[finalDurations.length - 1] += totalDuration - sum;
+        finalDurations[finalDurations.length - 1]! += totalDuration - sum;
+      }
+
+      const firstVowelIndex = phones.findIndex((p) => ["a", "i", "u", "e", "o"].includes(p));
+      let lastVowelIndex = -1;
+      for (let i = phones.length - 1; i >= 0; i--) {
+        if (["a", "i", "u", "e", "o"].includes(phones[i]!)) {
+          lastVowelIndex = i;
+          break;
+        }
       }
 
       let cursor = start;
       phones.forEach((phone, index) => {
         const pDur = finalDurations[index] ?? 0;
         const cls = classifyPhone(phone);
-        const role = ["a", "i", "u", "e", "o"].includes(phone)
-          ? ("anchor" as const)
-          : ("pre" as const);
+
+        let role: "pre" | "anchor" | "tail" = "pre";
+        if (firstVowelIndex !== -1 && lastVowelIndex !== -1) {
+          if (index < firstVowelIndex) {
+            role = "pre";
+          } else if (index > lastVowelIndex) {
+            role = "tail";
+          } else {
+            role = "anchor";
+          }
+        }
+
         events.push({
           start: cursor,
           end: cursor + pDur,

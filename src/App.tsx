@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { transcribeText } from "../engine/index.ts";
+import { transcribeText } from "../engine/vmora/index.ts";
 import { APITester } from "./APITester.tsx";
 import "./index.css";
 
@@ -415,6 +415,65 @@ export function App() {
                         }}
                       >
                         Tải rule.js
+                      </a>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "1.25rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: "1.75rem",
+                        height: "1.75rem",
+                        borderRadius: "50%",
+                        backgroundColor: "#fef2f2",
+                        color: "#ef4444",
+                        fontWeight: "700",
+                        fontSize: "0.8125rem",
+                      }}
+                    >
+                      ★
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.9375rem",
+                        lineHeight: "1.7",
+                        color: "#374151",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      Xem bản Demo Timeline trực quan:
+                      <a
+                        href="./lathuyenuocmo.musicxml.player.html"
+                        target="_blank"
+                        className="bg-purple-600 text-white font-semibold text-center rounded-lg"
+                        style={{
+                          display: "inline-block",
+                          padding: "0.25rem 0.75rem",
+                          fontSize: "0.8125rem",
+                          textDecoration: "none",
+                          marginLeft: "0.5rem",
+                          borderRadius: "0.5rem",
+                        }}
+                      >
+                        Lá Thư Yêu Ước Mơ (Player)
+                      </a>
+                      <a
+                        href="./emlamamnoncuadang.musicxml.player.html"
+                        target="_blank"
+                        className="bg-purple-600 text-white font-semibold text-center rounded-lg"
+                        style={{
+                          display: "inline-block",
+                          padding: "0.25rem 0.75rem",
+                          fontSize: "0.8125rem",
+                          textDecoration: "none",
+                          marginLeft: "0.5rem",
+                          borderRadius: "0.5rem",
+                        }}
+                      >
+                        Em Làm Mầm Non Của Đảng (Player)
                       </a>
                     </div>
                   </div>

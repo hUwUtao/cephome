@@ -1,5 +1,6 @@
 {
   "name": "@cephome/engine",
+  "bin": "./cli.ts",
   "type": "module",
   "module": "index.ts",
   "scripts": {

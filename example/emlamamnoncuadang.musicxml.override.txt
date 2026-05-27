@@ -1,0 +1,87 @@
+# cephome pronunciation dictionary v1
+# Format: word pre | nucleus | tail
+# [] marks ghost/compressed phones. Run with --omit-ghost to drop bracketed phones.
+# !N sets velocity. Tailing / \ ? ~ . is accepted as a tone hint.
+# Example: khiên k h | i [w] e | n
+
+# [1] Em là búp măng non em lớn lên trong mùa cách mạng sướng vui có Đảng tiên phong có Đảng như ánh thái dương sống yên vui trong tình yêu thương cuộc đời ngàn năm bừng sáng Khăn quàng thắm mãi em ghi chiến công anh hùng cách mạng Tiếng thơm muôn đời còn vang sáng ngời ý chí đấu tranh bước lên theo lý tưởng quang vinh Của Đảng tiên phong dẫn đường Tiếng hát của chúng em bay qua muôn trùng sông núi Ghi công ơn của Đảng tiền phong em sướng vui Có sách mới áo hoa đây là nhờ ơn Đảng ta vui tung tăng em ca có Đảng cuộc đời nở hoa
+Em  | e | N
+là r | a |
+búp b | u | p
+măng m | a | N g
+non n | o | N
+lớn r | o | N
+lên r | e | N
+trong ch | o | N g
+mùa m | [u] o |
+cách [k] | a | k
+mạng m | a | N g cl
+sướng s | [u] o | N g
+vui v | u [i] |
+có [k] | o |
+Đảng d | a | N g
+tiên t | [i] e | N
+phong f | o | N g
+như ny | u |
+ánh  | a | N
+thái t h | a i |
+dương z | [u] o | N g
+sống s | o | N g
+yên  | [i] e | N
+tình t | i | N
+yêu  | [i] e u |
+thương t h | [u] o | N g
+cuộc [k] | [u] o | k
+đời d | o [i] |
+ngàn n g | a | N
+năm n | a | N
+bừng b | u | N g
+sáng s | a | N g
+Khăn [k] | a | N
+quàng k w | a | N g
+thắm t h | a | N
+mãi m | a i | cl
+ghi g | i |
+chiến ch | [i] e | N
+công [k] | o | N g
+anh  | a | N
+hùng h | u | N g
+Tiếng t | [i] e | N g
+thơm t h | o | N
+muôn m | [u] o | N
+còn [k] | o | N
+vang v | a | N g
+ngời n g | o [i] |
+ý  | i |
+chí ch | i |
+đấu d | o [u] |
+tranh ch | a | N
+bước b | [u] o | k
+theo t h | e o |
+lý r | i |
+tưởng t | [u] o | N g
+quang k w | a | N g
+vinh v | i | N
+Của [k] | [u] o |
+dẫn z | a | N cl
+đường d | [u] o | N g
+hát h | a | t
+chúng ch | u | N g
+bay b | a i |
+qua k w | a |
+trùng ch | u | N g
+sông s | o | N g
+núi n | u [i] |
+ơn  | o | N
+tiền t | [i] e | N
+sách s | a | k
+mới m | o [i] |
+áo  | a o |
+hoa h w | a |
+đây d | a i |
+nhờ ny | o |
+ta t | a |
+tung t | u | N g
+tăng t | a | N g
+ca [k] | a |
+nở n | o |

@@ -1,10 +1,7 @@
 async function minifyJs(code: string): Promise<string> {
   try {
-    const result = await Bun.build({
-      entrypoints: [code],
-      minify: true,
-    });
-    return await result.outputs[0]!.text();
+    const transpiler = new Bun.Transpiler({ loader: "js" });
+    return transpiler.transformSync(code);
   } catch {
     return code;
   }
@@ -12,11 +9,11 @@ async function minifyJs(code: string): Promise<string> {
 
 async function minifyCss(code: string): Promise<string> {
   try {
-    const result = await Bun.build({
-      entrypoints: [code],
-      minify: true,
-    });
-    return await result.outputs[0]!.text();
+    return code
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\s+/g, " ")
+      .replace(/\s*([{}|:;,])\s*/g, "$1")
+      .trim();
   } catch {
     return code;
   }
@@ -53,23 +50,8 @@ export async function generateInteractivePlayerHtml(
 			color: var(--text);
 			height: 100vh;
 			display: grid;
-			grid-template-rows: auto 1fr auto auto;
+			grid-template-rows: 1fr auto auto;
 			overflow: hidden;
-		}
-		header {
-			padding: 0.75rem 1.5rem;
-			background: var(--panel);
-			border-bottom: 1px solid #e2e8f0;
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-			z-index: 50;
-		}
-		h1 {
-			margin: 0;
-			font-size: 1.1rem;
-			font-weight: 700;
 		}
 		.controls {
 			background: var(--panel);
@@ -100,7 +82,13 @@ export async function generateInteractivePlayerHtml(
 		}
 		.timeline-content {
 			height: 100%;
+			width: max-content;
 			position: relative;
+		}
+		.timeline-content svg {
+			height: 100%;
+			width: auto;
+			display: block;
 		}
 		.status-bar {
 			padding: 0.4rem 1.5rem;
@@ -140,10 +128,27 @@ export async function generateInteractivePlayerHtml(
 		const paddingLeft = 140;
 		const chartWidth = Math.max(1, svgViewBox.width - paddingLeft - 60);
 
-		const phoneEvents = Array.from(document.querySelectorAll('.phone-event'));
-		const noteBlocks = Array.from(document.querySelectorAll('.note-block'));
+		// Pre-parse DOM metadata to eliminate frame-loop DOM attribute reading overhead
+		const phoneEvents = Array.from(document.querySelectorAll('.phone-event')).map(el => ({
+			el,
+			start: parseFloat(el.getAttribute('data-start') || '0'),
+			end: parseFloat(el.getAttribute('data-end') || '0'),
+			active: false
+		}));
+		const noteBlocks = Array.from(document.querySelectorAll('.note-block')).map(el => ({
+			el,
+			start: parseFloat(el.getAttribute('data-start') || '0'),
+			end: parseFloat(el.getAttribute('data-end') || '0'),
+			active: false
+		}));
 
 		let lastTime = -1;
+
+		function getScale() {
+			if (!svg || !svgViewBox.width) return 1;
+			const clientWidth = svg.clientWidth;
+			return clientWidth > 0 ? (clientWidth / svgViewBox.width) : 1;
+		}
 
 		function updateCursor(time) {
 			if (!svg) return;
@@ -154,57 +159,64 @@ export async function generateInteractivePlayerHtml(
 			const x = paddingLeft + (ratio * chartWidth);
 
 			if (cursor) {
-				cursor.setAttribute('x1', x);
-				cursor.setAttribute('x2', x);
+				cursor.setAttribute('x1', x.toString());
+				cursor.setAttribute('x2', x.toString());
 			}
 
-			if (autoscroll.checked && !audio.paused) {
-				const scrollLeft = x - (viewport.clientWidth / 2);
+			if (autoscroll && autoscroll.checked) {
+				const scale = getScale();
+				const scrollLeft = (x * scale) - (viewport.clientWidth / 2);
 				viewport.scrollLeft = scrollLeft;
 			}
 
-			phoneEvents.forEach(el => {
-				const start = parseFloat(el.getAttribute('data-start'));
-				const end = parseFloat(el.getAttribute('data-end'));
-				if (time >= start && time < end) el.classList.add('active');
-				else el.classList.remove('active');
-			});
+			// Perform optimized highlight updates by mutating classes only when state changes
+			for (let i = 0; i < phoneEvents.length; i++) {
+				const item = phoneEvents[i];
+				const isActive = time >= item.start && time < item.end;
+				if (isActive !== item.active) {
+					item.active = isActive;
+					if (isActive) item.el.classList.add('active');
+					else item.el.classList.remove('active');
+				}
+			}
 
-			noteBlocks.forEach(el => {
-				const start = parseFloat(el.getAttribute('data-start'));
-				const end = parseFloat(el.getAttribute('data-end'));
-				if (time >= start && time < end) el.classList.add('active');
-				else el.classList.remove('active');
-			});
+			for (let i = 0; i < noteBlocks.length; i++) {
+				const item = noteBlocks[i];
+				const isActive = time >= item.start && time < item.end;
+				if (isActive !== item.active) {
+					item.active = isActive;
+					if (isActive) item.el.classList.add('active');
+					else item.el.classList.remove('active');
+				}
+			}
 
 			timeDisplay.textContent = time.toFixed(3) + 's / ' + totalDuration.toFixed(3) + 's';
 		}
 
 		function frame() {
-			if (!audio.paused || audio.seeking) {
+			if (!audio.paused) {
 				updateCursor(audio.currentTime);
 			}
 			requestAnimationFrame(frame);
 		}
 		requestAnimationFrame(frame);
 
-		viewport.addEventListener('scroll', () => {
-			if (svg) {
-				svg.style.setProperty('--scroll-x', viewport.scrollLeft + 'px');
-			}
-		});
+		audio.addEventListener('timeupdate', () => updateCursor(audio.currentTime));
+		audio.addEventListener('seeking', () => updateCursor(audio.currentTime));
+		audio.addEventListener('seeked', () => updateCursor(audio.currentTime));
+		audio.addEventListener('play', () => updateCursor(audio.currentTime));
 
 		if (svg) {
 			svg.addEventListener('click', (e) => {
-				const pt = svg.createSVGPoint();
-				pt.x = e.clientX;
-				pt.y = e.clientY;
-				const ctm = svg.getScreenCTM();
-				if (!ctm) return;
-				const localPt = pt.matrixTransform(ctm.inverse());
+				const rect = svg.getBoundingClientRect();
+				const clickX = e.clientX - rect.left;
+				
+				// Translate click to SVG local coordinates using viewBox
+				const scale = getScale();
+				const localX = clickX / scale;
 
-				if (localPt.x >= paddingLeft && localPt.x <= paddingLeft + chartWidth) {
-					const ratio = (localPt.x - paddingLeft) / chartWidth;
+				if (localX >= paddingLeft && localX <= paddingLeft + chartWidth) {
+					const ratio = (localX - paddingLeft) / chartWidth;
 					const time = ratio * totalDuration;
 					audio.currentTime = time;
 					updateCursor(time);
@@ -216,7 +228,6 @@ export async function generateInteractivePlayerHtml(
 			timeDisplay.textContent = '0.000s / ' + totalDuration.toFixed(3) + 's';
 		});
 	`;
-
   const [minCss, minJs] = await Promise.all([minifyCss(css), minifyJs(js)]);
 
   const html = `<!DOCTYPE html>
@@ -224,18 +235,10 @@ export async function generateInteractivePlayerHtml(
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Cephome Timeline Player - ${basename}</title>
+	<title>Timeline Player - ${basename}</title>
 	<style>${minCss}</style>
 </head>
 <body>
-	<header>
-		<div>
-			<h1>Cephome Player</h1>
-			<div style="font-size: 0.75rem; color: #94a3b8;">${sourceName}</div>
-		</div>
-		<div class="badge">VIETNAMESE SVS</div>
-	</header>
-
 	<main class="player-main">
 		<div class="timeline-viewport" id="viewport">
 			<div class="timeline-content" id="content">
@@ -253,7 +256,7 @@ export async function generateInteractivePlayerHtml(
 	</div>
 
 	<footer class="status-bar">
-		<div>Cephome Phonemetizer Engine</div>
+		<div></div>
 		<div id="time-display">0.000s / --.---s</div>
 	</footer>
 
