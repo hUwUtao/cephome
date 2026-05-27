@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { SinsyLabelPipeline, VietnameseMoraPlanTranspiler, expressionForNote } from "./index.ts";
-import type { ScoreNote } from "./types.ts";
+import { SinsyLabelPipeline, VietnameseMoraPlanTranspiler, expressionForNote } from "../index.ts";
+import type { ScoreNote } from "../lab/types.ts";
 
 const TONAL_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="4.0">

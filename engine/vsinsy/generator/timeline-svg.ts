@@ -1,4 +1,4 @@
-import type { PhoneEvent } from "./types.ts";
+import type { PhoneEvent } from "../lab/types.ts";
 
 function midiToNoteName(midi: number): string {
   const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -39,7 +39,7 @@ function calculateTonalOffset(
   index: number,
   count: number,
   dynamic: string = "mf",
-  expression: string | null = null,
+  _expression: string | null = null,
 ): number {
   if (count <= 1) return 0;
   const ratio = index / (count - 1);
@@ -64,9 +64,6 @@ function calculateTonalOffset(
     default:
       offset = 0;
   }
-
-  // Feature 2: "Smooth" Tone-Decimator / Tune Value
-  const isSmooth = expression?.toLowerCase().includes("smooth");
 
   // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
   const scale = dynamicScaleFactor(dynamic);
@@ -211,7 +208,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
   const barLines: string[] = [];
   const sortedMeasures = Array.from(measureStartTimes.entries()).sort((a, b) => a[1] - b[1]);
 
-  sortedMeasures.forEach(([mNum, mStart], idx) => {
+  sortedMeasures.forEach(([mNum, mStart]) => {
     const x = getX(mStart);
     // Bold Measure line
     barLines.push(`

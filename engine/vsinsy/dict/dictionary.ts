@@ -1,8 +1,8 @@
-import { canonicalizeVietnamese, normalizeSyllable } from "../normalize.ts";
+import { canonicalizeVietnamese, normalizeSyllable } from "../../vmora/normalize.ts";
 import rawDictionary from "./vietnamese-dictionary.json" with { type: "json" };
-import { metadataForLyric } from "./vietnamese-metadata.ts";
-import { parsePhoneUnit } from "./phone-plan.ts";
-import type { ParsedPhonePlan } from "./phone-plan.ts";
+import { metadataForLyric } from "../mxl/vietnamese-metadata.ts";
+import { parsePhoneUnit } from "../lab/phone-plan.ts";
+import type { ParsedPhonePlan } from "../lab/phone-plan.ts";
 
 interface VietnameseDictionaryFile {
   version: number;

@@ -1,8 +1,8 @@
-import { canonicalizeVietnamese } from "../normalize.ts";
-import { metadataForLyric } from "./vietnamese-metadata.ts";
+import { canonicalizeVietnamese } from "../../vmora/normalize.ts";
+import { metadataForLyric } from "../mxl/vietnamese-metadata.ts";
 import { VietnameseMoraPlanTranspiler } from "./mora-plan.ts";
 import { formatPhoneUnit, formatSimplePhoneGroups, parsePhoneGroups } from "./phone-plan.ts";
-import type { VietnameseDictionaryEntries } from "./dictionary.ts";
+import type { VietnameseDictionaryEntries } from "../dict/dictionary.ts";
 import type { PhonePlanParseOptions } from "./phone-plan.ts";
 import type { ScoreDocument, ScoreNote } from "./types.ts";
 

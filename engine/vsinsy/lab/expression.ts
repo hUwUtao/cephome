@@ -84,7 +84,7 @@ function calculateTonalOffset(
   index: number,
   count: number,
   dynamic: string = "mf",
-  expression: string | null = null,
+  _expression: string | null = null,
 ): number {
   if (count <= 1) return 0;
   const ratio = index / (count - 1);
@@ -109,9 +109,6 @@ function calculateTonalOffset(
     default:
       offset = 0;
   }
-
-  // Feature 2: "Smooth" Tone-Decimator / Tune Value
-  const isSmooth = expression?.toLowerCase().includes("smooth");
 
   // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
   const scale = dynamicScaleFactor(dynamic);

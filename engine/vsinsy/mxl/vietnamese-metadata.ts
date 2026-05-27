@@ -1,12 +1,12 @@
-import { extractTone } from "../normalize.ts";
-import { segmentSyllable } from "../segment.ts";
+import { extractTone } from "../../vmora/normalize.ts";
+import { segmentSyllable } from "../../vmora/segment.ts";
 import type {
   CodaClass,
   NucleusClass,
   PhonationClass,
   RhymeClass,
   VietnameseSyllableMetadata,
-} from "./types.ts";
+} from "../lab/types.ts";
 
 export const VOWEL_SIGNATURES: Record<string, number> = {
   a: 1,

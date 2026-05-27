@@ -1,7 +1,7 @@
-import { canonicalizeVietnamese, extractTone } from "../normalize.ts";
-import { segmentSyllable } from "../segment.ts";
-import { codaToPhonemes } from "../van.ts";
-import type { ScoreDocument, ScoreNormalizer, ScoreNote } from "./types.ts";
+import { canonicalizeVietnamese, extractTone } from "../../vmora/normalize.ts";
+import { segmentSyllable } from "../../vmora/segment.ts";
+import { codaToPhonemes } from "../../vmora/van.ts";
+import type { ScoreDocument, ScoreNormalizer, ScoreNote } from "../lab/types.ts";
 
 export interface VocalLineNormalizerOptions {
   partId?: string;
@@ -246,7 +246,7 @@ export class VocalLineNormalizer implements ScoreNormalizer {
                 }
               }
             }
-          } catch (e) {
+          } catch {
             // Syllable parsing failed, skip expansion gracefully
           }
         }

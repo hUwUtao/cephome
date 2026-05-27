@@ -9,8 +9,8 @@ import type {
   TimingStrategy,
 } from "./types.ts";
 import { classifyPhone } from "./phoneme.ts";
-import { DEFAULT_VIETNAMESE_METADATA } from "./vietnamese-metadata.ts";
-import { isFixedOnset } from "../onset.ts";
+import { DEFAULT_VIETNAMESE_METADATA } from "../mxl/vietnamese-metadata.ts";
+import { isFixedOnset } from "../../vmora/onset.ts";
 
 export class CumulativeFloatTimingStrategy implements TimingStrategy {
   toPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {

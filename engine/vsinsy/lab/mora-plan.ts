@@ -1,11 +1,11 @@
-import { codaToPhonemes, nucleusToPhonemes, getDominantVowelPhone } from "../van.ts";
-import { onsetToPhonemes } from "../onset.ts";
-import { segmentSyllable } from "../segment.ts";
+import { codaToPhonemes, nucleusToPhonemes, getDominantVowelPhone } from "../../vmora/van.ts";
+import { onsetToPhonemes } from "../../vmora/onset.ts";
+import { segmentSyllable } from "../../vmora/segment.ts";
 import type { RoleAwareLyricTranspiler, SyllablePhonePlan, TimedPhonePlan } from "./types.ts";
 import { validateSinsyPhones } from "./phoneme.ts";
-import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "./vietnamese-metadata.ts";
-import { dictionaryPlanForLyric } from "./dictionary.ts";
-import type { VietnameseDictionaryEntries } from "./dictionary.ts";
+import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "../mxl/vietnamese-metadata.ts";
+import { dictionaryPlanForLyric } from "../dict/dictionary.ts";
+import type { VietnameseDictionaryEntries } from "../dict/dictionary.ts";
 
 type SinsyVietnameseMode = "transparent" | "voicevox" | "singing";
 

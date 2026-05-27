@@ -1,9 +1,9 @@
 import type { ScoreDocument, ScoreNote, ScorePitch, PhoneEvent } from "./types.ts";
-import { canonicalizeVietnamese } from "../normalize.ts";
+import { canonicalizeVietnamese } from "../../vmora/normalize.ts";
 import { MonoLabelEmitter, SinsyFullLabelEmitter } from "./emitters.ts";
-import type { SinsySerializationResult } from "./index.ts";
-import { transcribeSyllableWithError } from "../index.ts";
-import { metadataForLyric, DEFAULT_VIETNAMESE_METADATA } from "./vietnamese-metadata.ts";
+import type { SinsySerializationResult } from "../index.ts";
+import { transcribeSyllableWithError } from "../../vmora/index.ts";
+import { metadataForLyric, DEFAULT_VIETNAMESE_METADATA } from "../mxl/vietnamese-metadata.ts";
 import { classifyPhone } from "./phoneme.ts";
 
 export interface FlatTtsOptions {

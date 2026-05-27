@@ -1,7 +1,7 @@
-import { transcribeSyllableWithError } from "../index.ts";
+import { transcribeSyllableWithError } from "../../vmora/index.ts";
 import type { LyricTranspilation, LyricTranspiler } from "./types.ts";
 import { validateSinsyPhones } from "./phoneme.ts";
-import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "./vietnamese-metadata.ts";
+import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "../mxl/vietnamese-metadata.ts";
 
 export class VietnameseSinsyLyricTranspiler implements LyricTranspiler {
   constructor(private readonly mode: "transparent" | "voicevox" = "voicevox") {}

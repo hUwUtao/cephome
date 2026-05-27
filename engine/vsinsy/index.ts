@@ -1,15 +1,21 @@
 import { writeFileSync } from "node:fs";
-import { DomMusicXmlParser } from "./musicxml.ts";
-import { MonoLabelEmitter, SinsyFullLabelEmitter } from "./emitters.ts";
-import { VowelAnchoredTimingStrategy } from "./timing.ts";
-import { VietnameseMoraPlanTranspiler } from "./mora-plan.ts";
-import { VocalLineNormalizer } from "./voice-select.ts";
-import { buildPhraseOverrideText, phraseOverrideDictionaryFromText } from "./phrase-override.ts";
-import { generateTimelineSvg } from "./timeline-svg.ts";
-import { generateInteractivePlayerHtml } from "./player-template.ts";
-import { flatTtsToLabel, isXml } from "./flat-tts.ts";
-import { readGlobalPhraseOverride, writeGlobalPhraseOverride } from "./phrase-override-hooks.ts";
-import type { PhonePlanParseOptions } from "./phone-plan.ts";
+import { DomMusicXmlParser } from "./mxl/musicxml.ts";
+import { MonoLabelEmitter, SinsyFullLabelEmitter } from "./lab/emitters.ts";
+import { VowelAnchoredTimingStrategy } from "./lab/timing.ts";
+import { VietnameseMoraPlanTranspiler } from "./lab/mora-plan.ts";
+import { VocalLineNormalizer } from "./mxl/voice-select.ts";
+import {
+  buildPhraseOverrideText,
+  phraseOverrideDictionaryFromText,
+} from "./lab/phrase-override.ts";
+import { generateTimelineSvg } from "./generator/timeline-svg.ts";
+import { generateInteractivePlayerHtml } from "./generator/player-template.ts";
+import { flatTtsToLabel, isXml } from "./lab/flat-tts.ts";
+import {
+  readGlobalPhraseOverride,
+  writeGlobalPhraseOverride,
+} from "./lab/phrase-override-hooks.ts";
+import type { PhonePlanParseOptions } from "./lab/phone-plan.ts";
 import type {
   LabelEmitter,
   LyricTranspiler,
@@ -18,7 +24,7 @@ import type {
   ScoreNote,
   ScoreNormalizer,
   TimingStrategy,
-} from "./types.ts";
+} from "./lab/types.ts";
 
 export interface SinsyPipelineOptions {
   parser?: MusicXmlParser;
@@ -155,7 +161,7 @@ export async function transcribeWithOverrides(
       writeFileSync(svgPath, svgContent, "utf8");
       if (!quiet) console.error(`output timeline SVG -> ${svgPath}`);
     } catch (e) {
-      console.error(`[cephome] failed to write SVG: ${e}`);
+      console.error(`[cephome] failed to write SVG: ${String(e)}`);
     }
 
     if (!noPlayer) {
@@ -165,7 +171,7 @@ export async function transcribeWithOverrides(
         writeFileSync(playerPath, playerHtml, "utf8");
         if (!quiet) console.error(`output player HTML -> ${playerPath}`);
       } catch (e) {
-        console.error(`[cephome] failed to write player HTML: ${e}`);
+        console.error(`[cephome] failed to write player HTML: ${String(e)}`);
       }
     }
   }
@@ -333,15 +339,15 @@ function appendList(lines: string[], title: string, items: string[]): void {
   for (const item of items) lines.push(`  ${item}`);
 }
 
-export * from "./emitters.ts";
-export * from "./expression.ts";
-export * from "./musicxml.ts";
-export * from "./mora-plan.ts";
-export * from "./phoneme.ts";
-export * from "./phrase-override.ts";
-export * from "./phrase-override-hooks.ts";
-export * from "./timing.ts";
-export * from "./transpiler.ts";
-export * from "./voice-select.ts";
-export * from "./flat-tts.ts";
-export type * from "./types.ts";
+export * from "./lab/emitters.ts";
+export * from "./lab/expression.ts";
+export * from "./mxl/musicxml.ts";
+export * from "./lab/mora-plan.ts";
+export * from "./lab/phoneme.ts";
+export * from "./lab/phrase-override.ts";
+export * from "./lab/phrase-override-hooks.ts";
+export * from "./lab/timing.ts";
+export * from "./lab/transpiler.ts";
+export * from "./mxl/voice-select.ts";
+export * from "./lab/flat-tts.ts";
+export type * from "./lab/types.ts";

@@ -11,10 +11,10 @@ import {
   VocalLineNormalizer,
   expressionForNote,
 } from "./index.ts";
-import { parseMusicXmlToLabelArgs, runMusicXmlToLabelAsync } from "./musicXMLtoLabel.ts";
-import { transcribe as transcribeRule } from "./rule-api.ts";
-import { runStub } from "./stub.ts";
-import { CumulativeFloatTimingStrategy, VowelAnchoredTimingStrategy } from "./timing.ts";
+import { parseMusicXmlToLabelArgs, runMusicXmlToLabelAsync } from "./bin/musicXMLtoLabel.ts";
+import { transcribe as transcribeRule } from "./bin/rule-api.ts";
+import { runStub } from "./bin/stub.ts";
+import { CumulativeFloatTimingStrategy, VowelAnchoredTimingStrategy } from "./lab/timing.ts";
 
 const SIMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="4.0">
@@ -672,7 +672,7 @@ test("stub passes MusicXML bytes to rule API", async () => {
 });
 
 test("classifyPhone correctly maps all 5 Sinsy types", () => {
-  const { classifyPhone } = require("./phoneme.ts");
+  const { classifyPhone } = require("./lab/phoneme.ts");
   expect(classifyPhone("sil")).toBe("s");
   expect(classifyPhone("pau")).toBe("p");
   expect(classifyPhone("br")).toBe("b");

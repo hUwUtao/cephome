@@ -1,6 +1,6 @@
 import { expressionForNote } from "./expression.ts";
 import type { LabelEmitter, PhoneEvent, ScoreNote } from "./types.ts";
-import { encodeVietnameseMetadata } from "./vietnamese-metadata.ts";
+import { encodeVietnameseMetadata } from "../mxl/vietnamese-metadata.ts";
 
 const P_SEP = ["", "@", "^", "-", "+", "=", "_", "%", "^", "_", "~", "-", "!", "[", "$", "]"];
 const A_SEP = ["/A:", "-", "-", "@", "~"];

@@ -34,7 +34,7 @@ async function main() {
     writeFileSync(htmlPath, html, "utf8");
     console.error(`Generated player -> ${htmlPath}`);
   } catch (e) {
-    console.error(`Failed to generate player: ${e}`);
+    console.error(`Failed to generate player: ${String(e)}`);
     process.exit(1);
   }
 }

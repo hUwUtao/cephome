@@ -1,6 +1,12 @@
 import { DOMParser } from "@xmldom/xmldom";
-import { canonicalizeVietnamese } from "../normalize.ts";
-import type { MusicXmlParser, ScoreBeat, ScoreDocument, ScoreNote, ScorePitch } from "./types.ts";
+import { canonicalizeVietnamese } from "../../vmora/normalize.ts";
+import type {
+  MusicXmlParser,
+  ScoreBeat,
+  ScoreDocument,
+  ScoreNote,
+  ScorePitch,
+} from "../lab/types.ts";
 
 type XmlElement = {
   getAttribute(name: string): string | null;
