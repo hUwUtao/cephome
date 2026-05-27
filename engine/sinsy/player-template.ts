@@ -1,18 +1,43 @@
-export function generateInteractivePlayerHtml(
+async function minifyJs(code: string): Promise<string> {
+  try {
+    const result = await Bun.build({
+      entrypoints: [code],
+      minify: true,
+    });
+    return await result.outputs[0]!.text();
+  } catch {
+    return code;
+  }
+}
+
+async function minifyCss(code: string): Promise<string> {
+  try {
+    const result = await Bun.build({
+      entrypoints: [code],
+      minify: true,
+    });
+    return await result.outputs[0]!.text();
+  } catch {
+    return code;
+  }
+}
+
+function minifyHtml(html: string): string {
+  return html
+    .replace(/>\s+</g, "><")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export async function generateInteractivePlayerHtml(
   svgContent: string,
   sourceName: string,
   audioUrl?: string,
-): string {
+): Promise<string> {
   const basename = sourceName.split(/[/\\]/).pop()?.split(".")[0] || "output";
   const wavUrl = audioUrl || `../../output/${basename}.wav`; // Default relative path for NEUTRINO projects
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Cephome Timeline Player - ${basename}</title>
-	<style>
+  const css = `
 		:root {
 			--bg: #f8fafc;
 			--panel: #ffffff;
@@ -59,7 +84,6 @@ export function generateInteractivePlayerHtml(
 			flex-grow: 1;
 			height: 36px;
 		}
-		/* Practical component layout */
 		.player-main {
 			position: relative;
 			overflow: hidden;
@@ -101,55 +125,19 @@ export function generateInteractivePlayerHtml(
 			text-transform: uppercase;
 			letter-spacing: 0.05em;
 		}
-	</style>
-</head>
-<body>
-	<header>
-		<div>
-			<h1>Cephome Player</h1>
-			<div style="font-size: 0.75rem; color: #94a3b8;">${sourceName}</div>
-		</div>
-		<div class="badge">VIETNAMESE SVS</div>
-	</header>
+	`;
 
-	<main class="player-main">
-		<div class="timeline-viewport" id="viewport">
-			<div class="timeline-content" id="content">
-				${svgContent}
-			</div>
-		</div>
-	</main>
-
-	<div class="controls">
-		<audio id="audio" controls src="${wavUrl}"></audio>
-		<div style="display: flex; flex-direction: column; gap: 2px;">
-			<span class="opt-label">Autoscroll</span>
-			<input type="checkbox" id="autoscroll" checked style="width: 18px; height: 18px; cursor: pointer;">
-		</div>
-	</div>
-
-	<footer class="status-bar">
-		<div>Cephome Phonemetizer Engine</div>
-		<div id="time-display">0.000s / --.---s</div>
-	</footer>
-
-	<script>
+  const js = `
 		const audio = document.getElementById('audio');
 		const svg = document.getElementById('timeline-svg');
 		const viewport = document.getElementById('viewport');
 		const autoscroll = document.getElementById('autoscroll');
 		const timeDisplay = document.getElementById('time-display');
-
 		const cursor = document.getElementById('cursor');
-		const pianoHead = document.getElementById('piano-head');
-
-		if (!svg) {
-			console.error("[cephome] timeline-svg not found");
-		}
 
 		const totalDuration = svg ? parseFloat(svg.getAttribute('data-total-duration') || '0') : 0;
 		const svgViewBox = svg ? svg.viewBox.baseVal : { width: 0 };
-		const paddingLeft = 140; 
+		const paddingLeft = 140;
 		const chartWidth = Math.max(1, svgViewBox.width - paddingLeft - 60);
 
 		const phoneEvents = Array.from(document.querySelectorAll('.phone-event'));
@@ -164,7 +152,7 @@ export function generateInteractivePlayerHtml(
 
 			const ratio = totalDuration > 0 ? Math.min(1, time / totalDuration) : 0;
 			const x = paddingLeft + (ratio * chartWidth);
-			
+
 			if (cursor) {
 				cursor.setAttribute('x1', x);
 				cursor.setAttribute('x2', x);
@@ -214,7 +202,7 @@ export function generateInteractivePlayerHtml(
 				const ctm = svg.getScreenCTM();
 				if (!ctm) return;
 				const localPt = pt.matrixTransform(ctm.inverse());
-				
+
 				if (localPt.x >= paddingLeft && localPt.x <= paddingLeft + chartWidth) {
 					const ratio = (localPt.x - paddingLeft) / chartWidth;
 					const time = ratio * totalDuration;
@@ -227,7 +215,51 @@ export function generateInteractivePlayerHtml(
 		audio.addEventListener('loadedmetadata', () => {
 			timeDisplay.textContent = '0.000s / ' + totalDuration.toFixed(3) + 's';
 		});
-	</script>
+	`;
+
+  const [minCss, minJs] = await Promise.all([minifyCss(css), minifyJs(js)]);
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Cephome Timeline Player - ${basename}</title>
+	<style>${minCss}</style>
+</head>
+<body>
+	<header>
+		<div>
+			<h1>Cephome Player</h1>
+			<div style="font-size: 0.75rem; color: #94a3b8;">${sourceName}</div>
+		</div>
+		<div class="badge">VIETNAMESE SVS</div>
+	</header>
+
+	<main class="player-main">
+		<div class="timeline-viewport" id="viewport">
+			<div class="timeline-content" id="content">
+				${svgContent}
+			</div>
+		</div>
+	</main>
+
+	<div class="controls">
+		<audio id="audio" controls src="${wavUrl}"></audio>
+		<div style="display: flex; flex-direction: column; gap: 2px;">
+			<span class="opt-label">Autoscroll</span>
+			<input type="checkbox" id="autoscroll" checked style="width: 18px; height: 18px; cursor: pointer;">
+		</div>
+	</div>
+
+	<footer class="status-bar">
+		<div>Cephome Phonemetizer Engine</div>
+		<div id="time-display">0.000s / --.---s</div>
+	</footer>
+
+	<script>${minJs}</script>
 </body>
 </html>`;
+
+  return minifyHtml(html);
 }

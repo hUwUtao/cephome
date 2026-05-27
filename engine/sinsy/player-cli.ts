@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { generateInteractivePlayerHtml } from "./player-template.ts";
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1 || args.includes("-h") || args.includes("--help")) {
     console.error(
-      "usage: playergenerator <input.timeline.svg> [output.html] [--audio path/to/audio.wav]",
+      "usage: cephome-player <input.timeline.svg> [output.html] [--audio path/to/audio.wav]",
     );
     process.exit(1);
   }
@@ -30,7 +30,7 @@ function main() {
 
   try {
     const svgContent = readFileSync(svgPath, "utf8");
-    const html = generateInteractivePlayerHtml(svgContent, svgPath, audioUrl);
+    const html = await generateInteractivePlayerHtml(svgContent, svgPath, audioUrl);
     writeFileSync(htmlPath, html, "utf8");
     console.error(`Generated player -> ${htmlPath}`);
   } catch (e) {
@@ -39,4 +39,4 @@ function main() {
   }
 }
 
-main();
+void main();

@@ -161,7 +161,8 @@ export async function transcribeWithOverrides(
     if (!noPlayer) {
       const playerPath = `${sourceName}.player.html`;
       try {
-        writeFileSync(playerPath, generateInteractivePlayerHtml(svgContent, sourceName), "utf8");
+        const playerHtml = await generateInteractivePlayerHtml(svgContent, sourceName);
+        writeFileSync(playerPath, playerHtml, "utf8");
         if (!quiet) console.error(`output player HTML -> ${playerPath}`);
       } catch (e) {
         console.error(`[cephome] failed to write player HTML: ${e}`);

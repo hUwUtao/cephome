@@ -47,7 +47,7 @@ const playerResult = spawnSync(
     "--target=bun-windows-x64",
     "./engine/sinsy/player-cli.ts",
     "--outfile",
-    "./bin/playergenerator.exe",
+    "./bin/cephome-player.exe",
   ],
   { stdio: "inherit" },
 );
@@ -85,7 +85,7 @@ if (!existsSync("dist")) {
 }
 
 copyFileSync("./bin/musicXMLtoLabel.exe", "./dist/musicXMLtoLabel.exe");
-copyFileSync("./bin/playergenerator.exe", "./dist/playergenerator.exe");
+copyFileSync("./bin/cephome-player.exe", "./dist/cephome-player.exe");
 copyFileSync("./bin/rule.js", "./dist/rule.js");
 
 console.log("Build completed successfully!");
