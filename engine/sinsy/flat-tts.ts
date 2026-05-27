@@ -35,6 +35,15 @@ function getScorePitch(midi: number): ScorePitch {
   };
 }
 
+export function isXml(content: string): boolean {
+  const trimmed = content.trim();
+  return (
+    trimmed.startsWith("<?xml") ||
+    trimmed.startsWith("<score-partwise") ||
+    trimmed.startsWith("<score-timewise")
+  );
+}
+
 export function parseTextToScore(text: string, options: FlatTtsOptions = {}): ScoreDocument {
   const pitchMidi = options.pitchMidi ?? 60;
   const tempo = options.tempo ?? 120;

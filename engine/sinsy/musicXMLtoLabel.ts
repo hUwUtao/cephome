@@ -1,34 +1,29 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, sep } from "node:path";
-import { SinsyLabelPipeline } from "./index.ts";
-import { flatTtsToLabel, parseTextToScore } from "./flat-tts.ts";
-import type { SinsySerializationTrace } from "./index.ts";
-import type { PhoneEvent, ScoreNote } from "./types.ts";
-
-import { generateTimelineSvg } from "./timeline-svg.ts";
-
-function isXml(content: string): boolean {
-  const trimmed = content.trim();
-  return (
-    trimmed.startsWith("<?xml") ||
-    trimmed.startsWith("<score-partwise") ||
-    trimmed.startsWith("<score-timewise")
-  );
-}
-import { buildPhraseOverrideText } from "./phrase-override.ts";
-import { readGlobalPhraseOverride, writeGlobalPhraseOverride } from "./phrase-override-hooks.ts";
+import { transcribeWithOverrides, installPhraseOverrideHooks } from "./index.ts";
 
 export interface MusicXmlToLabelArgs {
   inputPath: string;
   fullLabelPath: string;
   monoLabelPath: string;
   omitGhost?: boolean;
+  quiet?: boolean;
+  noSvg?: boolean;
 }
 
 export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
   const omitGhost = argv.includes("--omit-ghost");
-  const args = argv.filter((arg) => arg !== "--" && arg !== "--omit-ghost");
+  const quiet = argv.includes("--quiet") || argv.includes("-q");
+  const noSvg = argv.includes("--no-svg");
+  const args = argv.filter(
+    (arg) =>
+      arg !== "--" &&
+      arg !== "--omit-ghost" &&
+      arg !== "--quiet" &&
+      arg !== "-q" &&
+      arg !== "--no-svg",
+  );
   if (args.length !== 3 || args.includes("-h") || args.includes("--help")) {
     throw new Error(usage());
   }
@@ -38,11 +33,9 @@ export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
     fullLabelPath: args[1]!,
     monoLabelPath: args[2]!,
     omitGhost,
+    quiet,
+    noSvg,
   };
-}
-
-export function runMusicXmlToLabel(args: MusicXmlToLabelArgs): void {
-  runMusicXmlToLabelCore(args, readLocalPhraseOverride, writeLocalPhraseOverride);
 }
 
 export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promise<void> {
@@ -56,279 +49,25 @@ export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promis
   prepareTimingLabelDirectory(fullLabelPath);
 
   console.error(`Convert MusicXML to label -> ${inputPath}`);
-  const content = readFileSync(inputPath, "utf8");
-  if (!isXml(content)) {
-    console.error("[cephome] mode: Flat-TTS Mode");
-    const overridePath = phraseOverridePath(inputPath);
-    const overrideExists = existsSync(overridePath) && statSync(overridePath).isFile();
-    console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
+  const restoreHooks = installPhraseOverrideHooks(
+    inputPath,
+    args.omitGhost === true,
+    args.quiet === true,
+    args.noSvg === true,
+  );
+  try {
+    const result = await transcribeWithOverrides(readFileSync(inputPath), inputPath);
 
-    const score = parseTextToScore(content);
-    let totalSeconds = 0;
-    for (const note of score.notes) {
-      totalSeconds += (note.durationDiv / note.divisions) * (60 / note.tempo);
-    }
-    console.error(`[cephome] track duration: ${totalSeconds.toFixed(3)} seconds`);
-
-    const result = flatTtsToLabel(content);
     writeFileSync(fullLabelPath, result.full, "utf8");
     writeFileSync(monoLabelPath, result.mono, "utf8");
+  } finally {
+    restoreHooks();
+  }
+
+  if (!args.quiet) {
     console.error(`output full label -> ${fullLabelPath}`);
     console.error(`output mono label -> ${monoLabelPath}`);
-    return;
   }
-  console.error("[cephome] mode: Music Mode");
-  const phraseOverrideText = await readPhraseOverrideWithHooks(inputPath);
-  const overridePath = phraseOverridePath(inputPath);
-  const overrideExists =
-    (existsSync(overridePath) && statSync(overridePath).isFile()) || !!phraseOverrideText;
-  console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
-
-  const result = new SinsyLabelPipeline({
-    phraseOverrideText,
-    phraseOverrideOptions: { omitGhost: args.omitGhost },
-  }).serializeTrace(content, inputPath);
-  if (!phraseOverrideText?.trim()) {
-    await writePhraseOverrideWithHooks(inputPath, buildPhraseOverrideText(result.score));
-  }
-  const lastEvent = result.events[result.events.length - 1];
-  const durationSeconds = lastEvent ? lastEvent.end / 10_000_000 : 0;
-  console.error(`[cephome] track duration: ${durationSeconds.toFixed(3)} seconds`);
-
-  console.error(buildDiagnosticReport(result));
-
-  writeFileSync(fullLabelPath, result.full, "utf8");
-  writeFileSync(monoLabelPath, result.mono, "utf8");
-
-  const svgPath = monoLabelPath.endsWith(".lab")
-    ? monoLabelPath.slice(0, -4) + ".timeline.svg"
-    : monoLabelPath + ".timeline.svg";
-  writeFileSync(svgPath, generateTimelineSvg(result.events), "utf8");
-
-  console.error(`output full label -> ${fullLabelPath}`);
-  console.error(`output mono label -> ${monoLabelPath}`);
-  console.error(`output timeline SVG -> ${svgPath}`);
-}
-
-function runMusicXmlToLabelCore(
-  args: MusicXmlToLabelArgs,
-  readPhraseOverride: (inputPath: string) => string | null,
-  writePhraseOverride: (inputPath: string, content: string) => void,
-): void {
-  const inputPath = normalizeCliPath(args.inputPath);
-  const fullLabelPath = normalizeCliPath(args.fullLabelPath);
-  const monoLabelPath = normalizeCliPath(args.monoLabelPath);
-
-  assertInputFile(inputPath);
-  prepareOutputFile(fullLabelPath);
-  prepareOutputFile(monoLabelPath);
-  prepareTimingLabelDirectory(fullLabelPath);
-
-  console.error(`Convert MusicXML to label -> ${inputPath}`);
-  const content = readFileSync(inputPath, "utf8");
-  if (!isXml(content)) {
-    console.error("[cephome] mode: Flat-TTS Mode");
-    const overridePath = phraseOverridePath(inputPath);
-    const overrideExists = existsSync(overridePath) && statSync(overridePath).isFile();
-    console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
-
-    const score = parseTextToScore(content);
-    let totalSeconds = 0;
-    for (const note of score.notes) {
-      totalSeconds += (note.durationDiv / note.divisions) * (60 / note.tempo);
-    }
-    console.error(`[cephome] track duration: ${totalSeconds.toFixed(3)} seconds`);
-
-    const result = flatTtsToLabel(content);
-    writeFileSync(fullLabelPath, result.full, "utf8");
-    writeFileSync(monoLabelPath, result.mono, "utf8");
-    console.error(`output full label -> ${fullLabelPath}`);
-    console.error(`output mono label -> ${monoLabelPath}`);
-    return;
-  }
-  console.error("[cephome] mode: Music Mode");
-  const phraseOverrideText = readPhraseOverride(inputPath);
-  const overridePath = phraseOverridePath(inputPath);
-  const overrideExists =
-    (existsSync(overridePath) && statSync(overridePath).isFile()) || !!phraseOverrideText;
-  console.error(`[cephome] phrase override file: ${overrideExists ? "exists" : "none"}`);
-
-  const result = new SinsyLabelPipeline({
-    phraseOverrideText,
-    phraseOverrideOptions: { omitGhost: args.omitGhost },
-  }).serializeTrace(content, inputPath);
-  if (!phraseOverrideText?.trim()) {
-    writePhraseOverride(inputPath, buildPhraseOverrideText(result.score));
-  }
-  const lastEvent = result.events[result.events.length - 1];
-  const durationSeconds = lastEvent ? lastEvent.end / 10_000_000 : 0;
-  console.error(`[cephome] track duration: ${durationSeconds.toFixed(3)} seconds`);
-
-  console.error(buildDiagnosticReport(result));
-
-  writeFileSync(fullLabelPath, result.full, "utf8");
-  writeFileSync(monoLabelPath, result.mono, "utf8");
-
-  const svgPath = monoLabelPath.endsWith(".lab")
-    ? monoLabelPath.slice(0, -4) + ".timeline.svg"
-    : monoLabelPath + ".timeline.svg";
-  writeFileSync(svgPath, generateTimelineSvg(result.events), "utf8");
-
-  console.error(`output full label -> ${fullLabelPath}`);
-  console.error(`output mono label -> ${monoLabelPath}`);
-  console.error(`output timeline SVG -> ${svgPath}`);
-}
-
-function buildDiagnosticReport(result: SinsySerializationTrace): string {
-  const lines: string[] = [];
-  const notes = result.score.notes;
-  const events = result.events;
-  const monoRows = labelRows(result.mono);
-  const fullRows = labelRows(result.full);
-  const lyricNotes = notes.filter((note) => note.lyric);
-  const rests = notes.filter((note) => note.isRest);
-  const pitches = notes.flatMap((note) => (note.pitch ? [note.pitch.midi] : []));
-  const tempos = [...new Set(notes.map((note) => Math.round(note.tempo)))];
-  const voiceKey = dominantVoiceKey(notes);
-  const badDurations = events.filter((event) => event.end <= event.start);
-  const shortPhones = events.filter(
-    (event) => event.phoneme !== "pau" && event.end - event.start < 300_000,
-  );
-  const nonMonotonic = nonMonotonicEvents(events);
-  const badFullRows = fullRows.filter((row) => /NaN|undefined|null/.test(row.text));
-  const criticalXx = fullRows.filter((row) => /\/E:xx]xx\^|~xx!/.test(row.text));
-  const symbolicContext = fullRows.filter((row) =>
-    /glottalized|creaky|checked|contrary|parallel|oblique|diphthong|triphthong/.test(row.text),
-  );
-
-  lines.push("[cephome] diagnostic");
-  lines.push(`source=${result.score.sourceName}`);
-  lines.push(`selectedVoice=${voiceKey}`);
-  lines.push(
-    `notes=${notes.length} lyrics=${lyricNotes.length} rests=${rests.length} events=${events.length}`,
-  );
-  lines.push(`labelRows full=${fullRows.length} mono=${monoRows.length}`);
-  lines.push(`tempo=${tempos.join(",") || "none"}`);
-  lines.push(`pitch=${pitchRange(pitches)}`);
-  lines.push(`durationTicks=${durationRange(events)}`);
-  lines.push(`firstNote=${noteSummary(notes[0])}`);
-  lines.push(`lastNote=${noteSummary(notes[notes.length - 1])}`);
-  lines.push(`firstEvent=${eventSummary(events[0])}`);
-  lines.push(`lastEvent=${eventSummary(events[events.length - 1])}`);
-  lines.push(`rowCountMatch=${fullRows.length === monoRows.length ? "yes" : "no"}`);
-  lines.push(`badDurations=${badDurations.length}`);
-  lines.push(`nonMonotonic=${nonMonotonic.length}`);
-  lines.push(`shortPhonesLt30ms=${shortPhones.length}`);
-  lines.push(`badFullRows=${badFullRows.length}`);
-  lines.push(`criticalXx=${criticalXx.length}`);
-  lines.push(`symbolicContext=${symbolicContext.length}`);
-  lines.push(`phraseOverrideApplied=${result.phraseOverrideApplied}`);
-  appendList(lines, "notes", notes.map(noteSummary));
-  appendList(lines, "events", events.map(eventSummary));
-  appendList(lines, "badDurationEvents", badDurations.map(eventSummary));
-  appendList(lines, "nonMonotonicEvents", nonMonotonic.map(eventSummary));
-  appendList(lines, "shortPhonesLt30ms", shortPhones.map(eventSummary));
-  appendList(
-    lines,
-    "badFullRows",
-    badFullRows.map((row) => `${row.index}:${row.text}`),
-  );
-  appendList(
-    lines,
-    "criticalXxRows",
-    criticalXx.map((row) => `${row.index}:${row.text}`),
-  );
-  appendList(
-    lines,
-    "symbolicContextRows",
-    symbolicContext.map((row) => `${row.index}:${row.text}`),
-  );
-  appendList(lines, "phraseOverrideWarnings", result.phraseOverrideWarnings);
-  return lines.join("\n");
-}
-
-function labelRows(label: string): Array<{ index: number; text: string }> {
-  return label
-    .split(/\r?\n/)
-    .map((text, index) => ({ index, text }))
-    .filter((row) => row.text.length > 0);
-}
-
-function dominantVoiceKey(notes: ScoreNote[]): string {
-  const counts = new Map<string, number>();
-  for (const note of notes) {
-    const key = `${note.partId}/${note.voice}/${note.staff}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  let bestKey = "none";
-  let bestCount = 0;
-  for (const [key, count] of counts) {
-    if (count > bestCount) {
-      bestKey = key;
-      bestCount = count;
-    }
-  }
-  return `${bestKey} (${bestCount})`;
-}
-
-function pitchRange(pitches: number[]): string {
-  if (pitches.length === 0) return "none";
-  return `${Math.min(...pitches)}..${Math.max(...pitches)}`;
-}
-
-function durationRange(events: PhoneEvent[]): string {
-  if (events.length === 0) return "none";
-  const starts = events.map((event) => event.start);
-  const ends = events.map((event) => event.end);
-  return `${Math.min(...starts)}..${Math.max(...ends)}`;
-}
-
-function noteSummary(note: ScoreNote | undefined): string {
-  if (!note) return "none";
-  const lyric = note.lyric ?? (note.carriedPhones ? `[${note.carriedPhones.join(",")}]` : "null");
-  const pitch = note.pitch ? `${note.pitch.name}/${note.pitch.midi}` : "rest";
-  return [
-    note.id,
-    `m=${note.measureNumber}`,
-    `div=${note.startDiv}-${note.endDiv}`,
-    `dur=${note.durationDiv}`,
-    `tempo=${note.tempo}`,
-    `pitch=${pitch}`,
-    `lyric=${lyric}`,
-    `rest=${note.isRest ? 1 : 0}`,
-    `tie=${note.tie ?? "0"}`,
-    `slur=${note.slur ?? "0"}`,
-  ].join(" ");
-}
-
-function eventSummary(event: PhoneEvent | undefined): string {
-  if (!event) return "none";
-  return [
-    `${event.start}-${event.end}`,
-    event.phoneme,
-    `role=${event.role}`,
-    `dur=${event.end - event.start}`,
-    `note=${event.note.id}`,
-    `lyric=${event.note.lyric ?? "null"}`,
-    `pitch=${event.note.pitch?.name ?? "rest"}`,
-    `tone=${event.tone}`,
-    `vowel=${event.vowelSign}`,
-  ].join(" ");
-}
-
-function nonMonotonicEvents(events: PhoneEvent[]): PhoneEvent[] {
-  const out: PhoneEvent[] = [];
-  let previousStart = Number.NEGATIVE_INFINITY;
-  for (const event of events) {
-    if (event.start < previousStart) out.push(event);
-    previousStart = event.start;
-  }
-  return out;
-}
-
-function appendList(lines: string[], title: string, items: string[]): void {
-  lines.push(`[cephome] ${title} (${items.length})`);
-  for (const item of items) lines.push(`  ${item}`);
 }
 
 function normalizeCliPath(path: string): string {
@@ -377,41 +116,9 @@ function prepareTimingLabelDirectory(fullLabelPath: string): void {
   mkdirSync(timingDir, { recursive: true });
 }
 
-function phraseOverridePath(inputPath: string): string {
-  return `${inputPath}.override.txt`;
-}
-
-function readLocalPhraseOverride(inputPath: string): string | null {
-  const path = phraseOverridePath(inputPath);
-  if (!existsSync(path) || !statSync(path).isFile()) return null;
-  return readFileSync(path, "utf8");
-}
-
-function writeLocalPhraseOverride(inputPath: string, content: string): void {
-  const path = phraseOverridePath(inputPath);
-  try {
-    if (existsSync(path)) return;
-    writeFileSync(path, content, "utf8");
-    console.error(`output phrase override -> ${path}`);
-  } catch {
-    // Best-effort convenience file only; label generation must not fail here.
-  }
-}
-
-async function readPhraseOverrideWithHooks(inputPath: string): Promise<string | null> {
-  const fromHook = await readGlobalPhraseOverride();
-  if (fromHook?.trim()) return fromHook;
-  return readLocalPhraseOverride(inputPath);
-}
-
-async function writePhraseOverrideWithHooks(inputPath: string, content: string): Promise<void> {
-  const wroteViaHook = await writeGlobalPhraseOverride(content);
-  if (!wroteViaHook) writeLocalPhraseOverride(inputPath, content);
-}
-
 function usage(): string {
   return [
-    "usage: musicXMLtoLabel [--omit-ghost] <input.musicxml> <full.lab> <mono.lab>",
+    "usage: musicXMLtoLabel [--omit-ghost] [--quiet] [--no-svg] <input.musicxml> <full.lab> <mono.lab>",
     "",
     "Drop-in NEUTRINO musicXMLtoLabel substitute.",
   ].join("\n");

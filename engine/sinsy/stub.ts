@@ -1,12 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, sep, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { installPhraseOverrideHooks } from "./phrase-override-hooks.ts";
 
 export interface StubArgs {
   inputPath: string;
   fullLabelPath: string;
   monoLabelPath: string;
   omitGhost?: boolean;
+  quiet?: boolean;
+  noSvg?: boolean;
+  noPlayer?: boolean;
 }
 
 export interface RuleModule {
@@ -21,9 +25,22 @@ type RuleTranscriber = (
 
 export function parseStubArgs(argv: string[]): StubArgs {
   const omitGhost = argv.includes("--omit-ghost");
-  const args = argv.filter((arg) => arg !== "--" && arg !== "--omit-ghost");
+  const quiet = argv.includes("--quiet") || argv.includes("-q");
+  const noSvg = argv.includes("--no-svg");
+  const noPlayer = argv.includes("--no-player");
+  const args = argv.filter(
+    (arg) =>
+      arg !== "--" &&
+      arg !== "--omit-ghost" &&
+      arg !== "--quiet" &&
+      arg !== "-q" &&
+      arg !== "--no-svg" &&
+      arg !== "--no-player",
+  );
   if (args.length !== 3 || args.includes("-h") || args.includes("--help")) {
-    throw new Error("usage: musicXMLtoLabel [--omit-ghost] <input.musicxml> <full.lab> <mono.lab>");
+    throw new Error(
+      "usage: musicXMLtoLabel [--omit-ghost] [--quiet] [--no-svg] [--no-player] <input.musicxml> <full.lab> <mono.lab>",
+    );
   }
 
   return {
@@ -31,6 +48,9 @@ export function parseStubArgs(argv: string[]): StubArgs {
     fullLabelPath: args[1]!,
     monoLabelPath: args[2]!,
     omitGhost,
+    quiet,
+    noSvg,
+    noPlayer,
   };
 }
 
@@ -51,7 +71,13 @@ export async function runStub(args: StubArgs): Promise<void> {
   prepareOutputFile(monoLabelPath);
 
   console.error(`Load rule -> ${rulePath}`);
-  const restorePhraseOverrideHooks = installPhraseOverrideHooks(inputPath, args.omitGhost === true);
+  const restorePhraseOverrideHooks = installPhraseOverrideHooks(
+    inputPath,
+    args.omitGhost === true,
+    args.quiet === true,
+    args.noSvg === true,
+    args.noPlayer === true,
+  );
   try {
     const transcribe = await loadRule(rulePath);
 
@@ -65,8 +91,10 @@ export async function runStub(args: StubArgs): Promise<void> {
     restorePhraseOverrideHooks();
   }
 
-  console.error(`output full label -> ${fullLabelPath}`);
-  console.error(`output mono label -> ${monoLabelPath}`);
+  if (!args.quiet) {
+    console.error(`output full label -> ${fullLabelPath}`);
+    console.error(`output mono label -> ${monoLabelPath}`);
+  }
 }
 
 export function findRulePath(): string | undefined {
@@ -126,43 +154,6 @@ function prepareOutputFile(path: string): void {
   }
 
   mkdirSync(parent, { recursive: true });
-}
-
-function installPhraseOverrideHooks(inputPath: string, omitGhost: boolean): () => void {
-  const path = `${inputPath}.override.txt`;
-  const previousRead: unknown = Reflect.get(globalThis, "read_phrase_override");
-  const previousWrite: unknown = Reflect.get(globalThis, "write_phrase_override");
-  const previousOmitGhost: unknown = Reflect.get(globalThis, "omit_phrase_ghost");
-  Reflect.set(globalThis, "omit_phrase_ghost", omitGhost);
-  Reflect.set(globalThis, "read_phrase_override", async () => {
-    try {
-      if (!existsSync(path) || !statSync(path).isFile()) return "";
-      return readFileSync(path, "utf8");
-    } catch {
-      return "";
-    }
-  });
-  Reflect.set(globalThis, "write_phrase_override", async (content: string) => {
-    try {
-      if (!existsSync(path)) writeFileSync(path, content, "utf8");
-    } catch {
-      // Best-effort sidecar only.
-    }
-    return path;
-  });
-  return () => {
-    restoreGlobal("read_phrase_override", previousRead);
-    restoreGlobal("write_phrase_override", previousWrite);
-    restoreGlobal("omit_phrase_ghost", previousOmitGhost);
-  };
-}
-
-function restoreGlobal(identifier: string, value: unknown): void {
-  if (value === undefined) {
-    Reflect.deleteProperty(globalThis, identifier);
-    return;
-  }
-  Reflect.set(globalThis, identifier, value);
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {

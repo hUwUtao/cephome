@@ -8,7 +8,7 @@ const ONSET_MAP: Record<string, string[]> = {
   ng: ["n", "g"],
   nh: ["ny"],
   ch: ["ch"],
-  tr: ["ty", "z"], // Hand-baked 'bite' from thuyenla.ccs
+  tr: ["ch"],
   th: ["ty"],
   ph: ["f"],
   kh: ["k"], // 'k' has more bite than 'h'

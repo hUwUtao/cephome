@@ -160,12 +160,9 @@ function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): strin
 function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPhonePlan[] {
   if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
   if (note.carriedPhones) {
-    const carried = note.carriedPhones.map((phone) => ({
-      phone,
-      role: "anchor" as const,
-      weight: 1,
-    }));
-    return note.hasBreath ? [...carried, { phone: "br", role: "breath", weight: 0.4 }] : carried;
+    let plan = phonesToPlan(note.carriedPhones);
+    if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
+    return plan;
   }
 
   let plan: TimedPhonePlan[];
@@ -173,6 +170,10 @@ function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPh
     plan = lyricTranspiler.plan(note.lyric).plan;
   } else {
     plan = phonesToPlan(note.lyric ? lyricTranspiler.transpile(note.lyric).phones : []);
+  }
+
+  if (note.codaSuppress) {
+    plan = plan.filter((item) => item.role !== "tail");
   }
 
   if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];

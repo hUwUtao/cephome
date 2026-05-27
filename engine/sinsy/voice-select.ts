@@ -1,5 +1,6 @@
 import { canonicalizeVietnamese, extractTone } from "../normalize.ts";
 import { segmentSyllable } from "../segment.ts";
+import { codaToPhonemes } from "../van.ts";
 import type { ScoreDocument, ScoreNormalizer, ScoreNote } from "./types.ts";
 
 export interface VocalLineNormalizerOptions {
@@ -226,17 +227,20 @@ export class VocalLineNormalizer implements ScoreNormalizer {
               if (!isGlideCoda) {
                 const suffix = note.lyric.slice(-coda.length);
                 if (suffix.toLowerCase() === coda.toLowerCase()) {
-                  // 1. Strip coda from the starting note's lyric
+                  // 1. Suppress coda from the starting note (keep lyric intact)
                   const startNote = { ...note };
-                  startNote.lyric = note.lyric.slice(0, -coda.length);
+                  startNote.codaSuppress = true;
                   out[i] = startNote;
 
-                  // 2. Append coda to the carriedPhones of the end note
+                  // 2. Append coda phonemes to the carriedPhones of the end note
                   const endNote = { ...out[chainEndIndex]! };
+                  const tone = extractTone(note.lyric);
+                  const codaPhones = codaToPhonemes(coda, tone, "transparent");
+
                   if (endNote.carriedPhones) {
-                    endNote.carriedPhones = [...endNote.carriedPhones, coda];
+                    endNote.carriedPhones = [...endNote.carriedPhones, ...codaPhones];
                   } else {
-                    endNote.carriedPhones = [coda];
+                    endNote.carriedPhones = codaPhones;
                   }
                   out[chainEndIndex] = endNote;
                 }

@@ -147,7 +147,7 @@ test("Sinsy singing plan keeps checked codas without artificial support glides",
   expect(transpiler.plan("tôi").phones).toEqual(["t", "o", "i"]);
   expect(transpiler.plan("xuôi").phones).toEqual(["s", "w", "o", "i"]);
   expect(transpiler.plan("chung").phones).toEqual(["ch", "u", "N", "g"]);
-  expect(transpiler.plan("trên").phones).toEqual(["ty", "z", "e", "N"]);
+  expect(transpiler.plan("trên").phones).toEqual(["ch", "e", "N"]);
   expect(transpiler.plan("thoáng").phones).toEqual(["t", "h", "o", "a", "N", "g"]);
 });
 

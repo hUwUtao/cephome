@@ -150,10 +150,10 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     e[25] = note.slur === "stop" || note.tie === "stop" || note.tie === "continue" ? "1" : "0";
     e[26] = note.slur === "start" || note.tie === "start" || note.tie === "continue" ? "1" : "0";
     e[27] = note.dynamic;
-    e[28] = String(expression.vibratoRateHz);
-    e[29] = String(expression.vibratoDepthCents);
+    e[28] = String(Math.round(expression.vibratoRateHz));
+    e[29] = String(Math.round(expression.vibratoDepthCents));
     e[30] = String(Math.round(expression.vibratoStartRatio * 100));
-    e[31] = String(expression.energy);
+    e[31] = String(Math.round(expression.energy));
     e[34] = note.hasStaccato ? "1" : "0";
     e[35] = note.hasStaccato ? "1" : "0";
     e[40] =
@@ -161,7 +161,7 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
     e[41] = expression.pitchDeltaToNext > 0 ? String(expression.pitchDeltaToNext) : "0";
     e[56] = formatPitchDiff(expression.pitchDeltaFromPrev);
     e[57] = formatPitchDiff(expression.pitchDeltaToNext);
-    e[58] = "0";
+    e[58] = String(Math.round(expression.tonalPitchOffset * 100)); // microtoning in cents?
     e[59] = note.hasBreath ? "1" : "0";
 
     const f = fill(9);

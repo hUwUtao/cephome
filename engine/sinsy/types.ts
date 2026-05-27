@@ -49,6 +49,7 @@ export interface ScoreNote {
   isCue: boolean;
   isPrintable: boolean;
   lyric: string | null;
+  codaSuppress?: boolean;
   carriedPhones: string[] | null;
   carriedTone: number | null;
   syllabic: "single" | "begin" | "middle" | "end" | null;

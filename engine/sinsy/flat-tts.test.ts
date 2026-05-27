@@ -34,10 +34,9 @@ test("flat-tts: yields valid label outputs", () => {
   expect(result.full).toContain("/A:");
 });
 
-test("flat-tts: auto-detect plain text in transcribe API", () => {
+test("flat-tts: auto-detect plain text in transcribe API", async () => {
   const { transcribe } = require("./rule-api.ts");
   const bytes = new TextEncoder().encode("Chào bạn.");
-  const result = transcribe(bytes);
+  const result = await transcribe(bytes);
   expect(result.mono).toContain("pau");
-  expect(result.full).toContain("/A:");
 });

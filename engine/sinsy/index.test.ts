@@ -11,7 +11,7 @@ import {
   VocalLineNormalizer,
   expressionForNote,
 } from "./index.ts";
-import { parseMusicXmlToLabelArgs, runMusicXmlToLabel } from "./musicXMLtoLabel.ts";
+import { parseMusicXmlToLabelArgs, runMusicXmlToLabelAsync } from "./musicXMLtoLabel.ts";
 import { transcribe as transcribeRule } from "./rule-api.ts";
 import { runStub } from "./stub.ts";
 import { CumulativeFloatTimingStrategy, VowelAnchoredTimingStrategy } from "./timing.ts";
@@ -489,19 +489,21 @@ trên ty z | e | N
   ]);
 });
 
-test("rule API decodes MusicXML bytes", () => {
-  const result = transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
+test("rule API decodes MusicXML bytes", async () => {
+  const result = await transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
   expect(result.mono).toContain("0 400000 k");
   expect(result.full).toContain("/E:C4]0^0=2/4~100");
 });
-
 test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
   expect(parseMusicXmlToLabelArgs(["score.musicxml", "full.lab", "mono.lab"])).toEqual({
     inputPath: "score.musicxml",
     fullLabelPath: "full.lab",
     monoLabelPath: "mono.lab",
     omitGhost: false,
+    quiet: false,
+    noSvg: false,
   });
+
   expect(
     parseMusicXmlToLabelArgs(["--omit-ghost", "score.musicxml", "full.lab", "mono.lab"]),
   ).toEqual({
@@ -509,10 +511,12 @@ test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
     fullLabelPath: "full.lab",
     monoLabelPath: "mono.lab",
     omitGhost: true,
+    quiet: false,
+    noSvg: false,
   });
 });
 
-test("musicXMLtoLabel runner writes full and mono files", () => {
+test("musicXMLtoLabel runner writes full and mono files", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -520,7 +524,7 @@ test("musicXMLtoLabel runner writes full and mono files", () => {
     const mono = join(dir, "score", "label", "mono", "score.lab");
     writeFileSync(input, SIMPLE_XML, "utf8");
 
-    runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
+    await runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
 
     expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
     expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
@@ -530,7 +534,7 @@ test("musicXMLtoLabel runner writes full and mono files", () => {
   }
 });
 
-test("musicXMLtoLabel reads existing phrase override and does not overwrite it", () => {
+test("musicXMLtoLabel reads existing phrase override and does not overwrite it", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-override-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -541,7 +545,7 @@ test("musicXMLtoLabel reads existing phrase override and does not overwrite it",
     writeFileSync(input, SIMPLE_XML, "utf8");
     writeFileSync(override, overrideText, "utf8");
 
-    runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
+    await runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
 
     expect(readFileSync(override, "utf8")).toBe(overrideText);
     expect(readFileSync(mono, "utf8")).toContain("0 400000 z");
@@ -551,7 +555,7 @@ test("musicXMLtoLabel reads existing phrase override and does not overwrite it",
   }
 });
 
-test("musicXMLtoLabel overwrites existing output files", () => {
+test("musicXMLtoLabel overwrites existing output files", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-overwrite-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -563,7 +567,7 @@ test("musicXMLtoLabel overwrites existing output files", () => {
     writeFileSync(full, "old full", "utf8");
     writeFileSync(mono, "old mono", "utf8");
 
-    runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
+    await runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
 
     expect(readFileSync(full, "utf8")).not.toBe("old full");
     expect(readFileSync(mono, "utf8")).not.toBe("old mono");
@@ -572,7 +576,7 @@ test("musicXMLtoLabel overwrites existing output files", () => {
   }
 });
 
-test("musicXMLtoLabel errors when output path is an existing directory", () => {
+test("musicXMLtoLabel errors when output path is an existing directory", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-dir-output-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -581,15 +585,15 @@ test("musicXMLtoLabel errors when output path is an existing directory", () => {
     writeFileSync(input, SIMPLE_XML, "utf8");
     mkdirSync(full);
 
-    expect(() =>
-      runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono }),
-    ).toThrow("Output path is a directory");
+    await expect(
+      runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono }),
+    ).rejects.toThrow("Output path is a directory");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("musicXMLtoLabel errors when output parent exists as a file", () => {
+test("musicXMLtoLabel errors when output parent exists as a file", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-file-parent-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -600,15 +604,15 @@ test("musicXMLtoLabel errors when output parent exists as a file", () => {
     writeFileSync(input, SIMPLE_XML, "utf8");
     writeFileSync(parentFile, "not a dir", "utf8");
 
-    expect(() =>
-      runMusicXmlToLabel({ inputPath: input, fullLabelPath: full, monoLabelPath: mono }),
-    ).toThrow("Output parent exists but is not a directory");
+    await expect(
+      runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono }),
+    ).rejects.toThrow("Output parent exists but is not a directory");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("musicXMLtoLabel accepts Windows-style separators on POSIX", () => {
+test("musicXMLtoLabel accepts Windows-style separators on POSIX", async () => {
   const dir = mkdtempSync(join(tmpdir(), "cephome-musicxmltolabel-winpath-"));
   try {
     const input = join(dir, "score.musicxml");
@@ -616,7 +620,7 @@ test("musicXMLtoLabel accepts Windows-style separators on POSIX", () => {
     const mono = join(dir, "score", "label", "mono", "score.lab");
     writeFileSync(input, SIMPLE_XML, "utf8");
 
-    runMusicXmlToLabel({
+    await runMusicXmlToLabelAsync({
       inputPath: input.replaceAll("/", "\\"),
       fullLabelPath: full.replaceAll("/", "\\"),
       monoLabelPath: mono.replaceAll("/", "\\"),

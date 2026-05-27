@@ -38,6 +38,24 @@ if (stubResult.status !== 0) {
   process.exit(stubResult.status ?? 1);
 }
 
+console.log("Building Player CLI...");
+const playerResult = spawnSync(
+  "bun",
+  [
+    "build",
+    "--compile",
+    "--target=bun-windows-x64",
+    "./engine/sinsy/player-cli.ts",
+    "--outfile",
+    "./bin/playergenerator.exe",
+  ],
+  { stdio: "inherit" },
+);
+
+if (playerResult.status !== 0) {
+  process.exit(playerResult.status ?? 1);
+}
+
 console.log("Building Sinsy rule.js...");
 const ruleResult = spawnSync(
   "bun",
@@ -67,6 +85,7 @@ if (!existsSync("dist")) {
 }
 
 copyFileSync("./bin/musicXMLtoLabel.exe", "./dist/musicXMLtoLabel.exe");
+copyFileSync("./bin/playergenerator.exe", "./dist/playergenerator.exe");
 copyFileSync("./bin/rule.js", "./dist/rule.js");
 
 console.log("Build completed successfully!");

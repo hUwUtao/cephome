@@ -94,9 +94,11 @@ function calculateTonalOffset(
 
 export function generateTimelineSvg(events: PhoneEvent[]): string {
   if (events.length === 0) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+    return `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200" data-total-duration="0">
 	<rect width="100%" height="100%" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
 	<text x="400" y="100" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="16" text-anchor="middle">No events to display</text>
+	<g id="piano-head" style="display:none"></g>
+	<line id="cursor" style="display:none"></line>
 </svg>`;
   }
 
@@ -271,7 +273,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 
       // Note box
       noteBoxes.push(`
-			<g>
+			<g class="note-block" data-note-id="${note.id}" data-start="${(nStart / 10_000_000).toFixed(4)}" data-end="${(nEnd / 10_000_000).toFixed(4)}">
 				<rect x="${x1}" y="${y - barHeight / 2}" width="${x2 - x1}" height="${barHeight}" rx="4" fill="#f472b6" fill-opacity="0.85" stroke="#db2777" stroke-width="1.5" />
 				<rect x="${x1 + 1}" y="${y - barHeight / 2 + 1}" width="${x2 - x1 - 4}" height="3" fill="#ffffff" fill-opacity="0.4" rx="1" />
 			</g>
@@ -359,7 +361,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 		`);
 
     phoneLabels.push(`
-		<g>
+		<g class="phone-event" data-start="${(event.start / 10_000_000).toFixed(4)}" data-end="${(event.end / 10_000_000).toFixed(4)}">
 			<rect x="${x1 + 1}" y="${height - paddingBottom + 10}" width="${x2 - x1 - 2}" height="28" rx="3" fill="${bandColor}" fill-opacity="0.1" stroke="${bandColor}" stroke-width="1" stroke-opacity="0.3" />
 			<text x="${(x1 + x2) / 2}" y="${height - paddingBottom + 27}" fill="${isSilence ? "#64748b" : "#1e293b"}" font-family="system-ui, sans-serif" font-weight="bold" font-size="11" text-anchor="middle">${event.phoneme}</text>
 		</g>
@@ -474,9 +476,16 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 		`);
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="100%">
+  return `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="100%" data-total-duration="${(totalTime / 10_000_000).toFixed(4)}">
 	<style>
 		text { user-select: none; }
+		.phone-event { transition: transform 0.1s ease; cursor: pointer; }
+		.phone-event:hover rect { fill-opacity: 0.3; }
+		.phone-event.active rect { fill-opacity: 0.5; stroke-opacity: 1; stroke-width: 2; }
+		.note-block { transition: filter 0.2s ease; }
+		.note-block.active { filter: drop-shadow(0 0 4px #db2777); }
+		#cursor { transition: x1 0.05s linear, x2 0.05s linear; pointer-events: none; }
+		#piano-head { transform: translateX(var(--scroll-x, 0)); will-change: transform; }
 	</style>
 	<!-- Pure White background (W3C Compliant & Light Mode) -->
 	<rect width="100%" height="100%" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
@@ -506,8 +515,10 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 	${noteTexts.join("")}
 
 	<!-- Left Piano Keys Overlay (CeVIO AI grey base) -->
-	<rect x="0" y="${paddingTop}" width="140" height="${chartHeight}" fill="#f1f5f9" stroke="#cbd5e1" opacity="0.95" />
-	${pianoKeys.join("")}
+	<g id="piano-head">
+		<rect x="0" y="${paddingTop}" width="140" height="${chartHeight}" fill="#f1f5f9" stroke="#cbd5e1" opacity="0.95" />
+		${pianoKeys.join("")}
+	</g>
 
 	<!-- Phoneme Labels Block at the bottom -->
 	${phoneLabels.join("")}
@@ -516,6 +527,9 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 	<line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="#94a3b8" stroke-width="1.5" />
 	${timeLabels.join("")}
 	<text x="${paddingLeft + chartWidth / 2}" y="${height - 20}" fill="#64748b" font-family="system-ui, sans-serif" font-size="12" text-anchor="middle">Timeline (Seconds)</text>
+
+	<!-- Interactive Cursor -->
+	<line id="cursor" x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="#ef4444" stroke-width="2" opacity="0.8" />
 </svg>`;
 }
 
