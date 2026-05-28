@@ -113,6 +113,18 @@ export async function generateInteractivePlayerHtml(
 			text-transform: uppercase;
 			letter-spacing: 0.05em;
 		}
+		#f0-actual-layer path {
+			stroke: #22c55e;
+			stroke-width: 2.5;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			fill: none;
+			opacity: 0.85;
+			transition: opacity 0.2s ease;
+		}
+		#f0-actual-layer.hidden {
+			display: none;
+		}
 	`;
 
   const js = `
@@ -227,6 +239,118 @@ export async function generateInteractivePlayerHtml(
 		audio.addEventListener('loadedmetadata', () => {
 			timeDisplay.textContent = '0.000s / ' + totalDuration.toFixed(3) + 's';
 		});
+
+		const toggleF0 = document.getElementById('toggle-f0');
+
+		async function loadActualF0() {
+			if (document.getElementById('f0-actual-layer')) return;
+			if (!svg) return;
+			const minMidi = parseInt(svg.getAttribute('data-min-midi') || '0', 10);
+			const maxMidi = parseInt(svg.getAttribute('data-max-midi') || '0', 10);
+			if (!minMidi || !maxMidi) return;
+
+			const paddingTop = parseInt(svg.getAttribute('data-padding-top') || '60', 10);
+			const paddingBottom = parseInt(svg.getAttribute('data-padding-bottom') || '90', 10);
+			const paddingLeft = parseInt(svg.getAttribute('data-padding-left') || '140', 10);
+			const paddingRight = parseInt(svg.getAttribute('data-padding-right') || '60', 10);
+			const height = parseInt(svg.getAttribute('data-height') || '700', 10);
+			const width = parseInt(svg.getAttribute('data-width') || '800', 10);
+
+			const chartWidth = width - paddingLeft - paddingRight;
+			const chartHeight = height - paddingTop - paddingBottom;
+			const midiRange = maxMidi - minMidi;
+			const laneHeight = chartHeight / (midiRange + 1);
+
+			const audioSrc = audio.getAttribute('src') || '';
+			if (!audioSrc) return;
+			const f0Url = audioSrc.substring(0, audioSrc.lastIndexOf('.')) + '.f0';
+
+			try {
+				const response = await fetch(f0Url);
+				if (!response.ok) {
+					console.warn('Actual F0 file not found at: ' + f0Url);
+					if (toggleF0) {
+						toggleF0.disabled = true;
+						const label = document.getElementById('label-f0');
+						if (label) {
+							label.textContent = 'F0 (N/A)';
+							label.style.color = '#cbd5e1';
+						}
+					}
+					return;
+				}
+
+				const arrayBuffer = await response.arrayBuffer();
+				const values = new Float32Array(arrayBuffer);
+				const frames = values.length;
+				const FRAME_DURATION = 0.01;
+
+				let currentSegment = [];
+				const segments = [];
+
+				for (let i = 0; i < frames; i++) {
+					const hz = values[i];
+					if (hz > 0) {
+						const time = i * FRAME_DURATION;
+						const midi = 69 + 12 * Math.log2(hz / 440);
+						const x = paddingLeft + (time / totalDuration) * chartWidth;
+						const y = paddingTop + (midiRange - (midi - minMidi)) * laneHeight + laneHeight / 2;
+						currentSegment.push({ x, y });
+					} else {
+						if (currentSegment.length > 0) {
+							segments.push(currentSegment);
+							currentSegment = [];
+						}
+					}
+				}
+				if (currentSegment.length > 0) {
+					segments.push(currentSegment);
+				}
+
+				let pathD = '';
+				for (const seg of segments) {
+					if (seg.length < 2) continue;
+					pathD += 'M ' + seg[0].x.toFixed(3) + ' ' + seg[0].y.toFixed(3);
+					for (let i = 0; i < seg.length - 1; i++) {
+						const p0 = seg[i];
+						const p1 = seg[i + 1];
+						const cp1x = p0.x + (p1.x - p0.x) / 3;
+						const cp2x = p1.x - (p1.x - p0.x) / 3;
+						pathD += ' C ' + cp1x.toFixed(3) + ' ' + p0.y.toFixed(3) + ' ' + cp2x.toFixed(3) + ' ' + p1.y.toFixed(3) + ' ' + p1.x.toFixed(3) + ' ' + p1.y.toFixed(3);
+					}
+				}
+
+				if (pathD) {
+					const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+					g.setAttribute('id', 'f0-actual-layer');
+					
+					const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+					path.setAttribute('d', pathD);
+					g.appendChild(path);
+
+					const cursorEl = document.getElementById('cursor');
+					if (cursorEl) {
+						svg.insertBefore(g, cursorEl);
+					} else {
+						svg.appendChild(g);
+					}
+				}
+			} catch (err) {
+				console.error('Error loading actual F0:', err);
+			}
+		}
+
+		if (toggleF0) {
+			toggleF0.addEventListener('change', () => {
+				const layer = document.getElementById('f0-actual-layer');
+				if (layer) {
+					if (toggleF0.checked) layer.classList.remove('hidden');
+					else layer.classList.add('hidden');
+				}
+			});
+		}
+
+		loadActualF0();
 	`;
   const [minCss, minJs] = await Promise.all([minifyCss(css), minifyJs(js)]);
 
@@ -252,6 +376,10 @@ export async function generateInteractivePlayerHtml(
 		<div style="display: flex; flex-direction: column; gap: 2px;">
 			<span class="opt-label">Autoscroll</span>
 			<input type="checkbox" id="autoscroll" checked style="width: 18px; height: 18px; cursor: pointer;">
+		</div>
+		<div style="display: flex; flex-direction: column; gap: 2px;">
+			<span class="opt-label" id="label-f0">Actual F0</span>
+			<input type="checkbox" id="toggle-f0" checked style="width: 18px; height: 18px; cursor: pointer;">
 		</div>
 	</div>
 

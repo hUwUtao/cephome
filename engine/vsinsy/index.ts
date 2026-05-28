@@ -10,6 +10,7 @@ import {
 } from "./lab/phrase-override.ts";
 import { generateTimelineSvg } from "./generator/timeline-svg.ts";
 import { generateInteractivePlayerHtml } from "./generator/player-template.ts";
+import type { F0Data } from "../vneuvis/types.ts";
 import { flatTtsToLabel, isXml } from "./lab/flat-tts.ts";
 import {
   readGlobalPhraseOverride,
@@ -156,7 +157,21 @@ export async function transcribeWithOverrides(
 
   if (sourceName && !noSvg) {
     const svgPath = `${sourceName}.timeline.svg`;
-    const svgContent = generateTimelineSvg(result.events);
+    let actualF0: F0Data | undefined;
+    try {
+      const baseWithoutExt = sourceName.substring(0, sourceName.lastIndexOf("."));
+      const f0PathOverride = (globalThis as any).f0_path;
+      const f0Path = f0PathOverride || baseWithoutExt + ".f0";
+      const { existsSync, readFileSync } = await import("node:fs");
+      if (existsSync(f0Path)) {
+        const { readF0 } = await import("../vneuvis/index.ts");
+        const f0Buf = readFileSync(f0Path);
+        actualF0 = readF0(f0Buf);
+      }
+    } catch (e) {
+      if (!quiet) console.error(`[cephome] failed to load actual F0: ${String(e)}`);
+    }
+    const svgContent = generateTimelineSvg(result.events, actualF0);
     try {
       writeFileSync(svgPath, svgContent, "utf8");
       if (!quiet) console.error(`output timeline SVG -> ${svgPath}`);

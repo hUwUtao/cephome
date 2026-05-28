@@ -35,6 +35,7 @@ export function installPhraseOverrideHooks(
   quiet: boolean,
   noSvg: boolean,
   noPlayer = false,
+  f0Path?: string,
 ): () => void {
   const path = `${inputPath}.override.txt`;
   const previousRead: unknown = Reflect.get(globalThis, "read_phrase_override");
@@ -43,11 +44,13 @@ export function installPhraseOverrideHooks(
   const previousQuiet: unknown = Reflect.get(globalThis, "quiet");
   const previousNoSvg: unknown = Reflect.get(globalThis, "no_svg");
   const previousNoPlayer: unknown = Reflect.get(globalThis, "no_player");
+  const previousF0Path: unknown = Reflect.get(globalThis, "f0_path");
 
   Reflect.set(globalThis, "omit_phrase_ghost", omitGhost);
   Reflect.set(globalThis, "quiet", quiet);
   Reflect.set(globalThis, "no_svg", noSvg);
   Reflect.set(globalThis, "no_player", noPlayer);
+  Reflect.set(globalThis, "f0_path", f0Path);
 
   Reflect.set(globalThis, "read_phrase_override", async () => {
     try {
@@ -72,6 +75,7 @@ export function installPhraseOverrideHooks(
     restoreGlobal("quiet", previousQuiet);
     restoreGlobal("no_svg", previousNoSvg);
     restoreGlobal("no_player", previousNoPlayer);
+    restoreGlobal("f0_path", previousF0Path);
   };
 }
 

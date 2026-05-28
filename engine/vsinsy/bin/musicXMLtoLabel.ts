@@ -10,19 +10,31 @@ export interface MusicXmlToLabelArgs {
   omitGhost?: boolean;
   quiet?: boolean;
   noSvg?: boolean;
+  f0Path?: string;
 }
 
 export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
   const omitGhost = argv.includes("--omit-ghost");
   const quiet = argv.includes("--quiet") || argv.includes("-q");
   const noSvg = argv.includes("--no-svg");
+
+  let f0Path: string | undefined;
+  const f0Idx = argv.findIndex((x) => x === "--f0" || x === "-f");
+  if (f0Idx !== -1 && f0Idx + 1 < argv.length) {
+    f0Path = argv[f0Idx + 1];
+  }
+
   const args = argv.filter(
-    (arg) =>
+    (arg, idx) =>
       arg !== "--" &&
       arg !== "--omit-ghost" &&
       arg !== "--quiet" &&
       arg !== "-q" &&
-      arg !== "--no-svg",
+      arg !== "--no-svg" &&
+      arg !== "--f0" &&
+      arg !== "-f" &&
+      (idx === 0 || argv[idx - 1] !== "--f0") &&
+      (idx === 0 || argv[idx - 1] !== "-f"),
   );
   if (args.length !== 3 || args.includes("-h") || args.includes("--help")) {
     throw new Error(usage());
@@ -35,6 +47,7 @@ export function parseMusicXmlToLabelArgs(argv: string[]): MusicXmlToLabelArgs {
     omitGhost,
     quiet,
     noSvg,
+    f0Path,
   };
 }
 
@@ -54,6 +67,8 @@ export async function runMusicXmlToLabelAsync(args: MusicXmlToLabelArgs): Promis
     args.omitGhost === true,
     args.quiet === true,
     args.noSvg === true,
+    false,
+    args.f0Path,
   );
   try {
     const result = await transcribeWithOverrides(readFileSync(inputPath), inputPath);
@@ -118,7 +133,7 @@ function prepareTimingLabelDirectory(fullLabelPath: string): void {
 
 function usage(): string {
   return [
-    "usage: musicXMLtoLabel [--omit-ghost] [--quiet] [--no-svg] <input.musicxml> <full.lab> <mono.lab>",
+    "usage: musicXMLtoLabel [--omit-ghost] [--quiet] [--no-svg] [--f0 path/to/file.f0] <input.musicxml> <full.lab> <mono.lab>",
     "",
     "Drop-in NEUTRINO musicXMLtoLabel substitute.",
   ].join("\n");

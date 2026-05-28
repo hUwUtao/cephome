@@ -1,4 +1,6 @@
 import type { PhoneEvent } from "../lab/types.ts";
+import type { F0Data } from "../../vneuvis/types.ts";
+import { hzToMidi } from "../../vneuvis/f0.ts";
 
 function midiToNoteName(midi: number): string {
   const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -38,31 +40,70 @@ function calculateTonalOffset(
   tone: number,
   index: number,
   count: number,
-  dynamic: string = "mf",
-  _expression: string | null = null,
+  dynamic: string,
+  expression: number,
 ): number {
-  if (count <= 1) return 0;
-  const ratio = index / (count - 1);
+  if (tone === 0 || count === 0) return 0;
+
+  // Pitch envelope profile based on tone class
+  // 1: Ngang (flat/high)
+  // 2: Huyền (falling)
+  // 3: Hỏi (dipping)
+  // 4: Ngã (rising glottalized)
+  // 5: Sắc (rising)
+  // 6: Nặng (low dropping)
+  const ratio = index / count;
   let offset = 0;
 
   switch (tone) {
-    case 1: // Huyền (Low falling)
+    case 1: // Ngang (Flat, high-ish pitch center)
+      offset = 0.2;
+      break;
+    case 2: // Huyền (Gradual fall)
       offset = -0.5 * ratio;
       break;
-    case 2: // Sắc (High rising)
-      offset = 0.6 * ratio;
+    case 3: // Hỏi (Dipping: starts low, dips further, recovers slightly)
+      if (ratio < 0.4) {
+        offset = -0.6 * (ratio / 0.4);
+      } else {
+        offset = -0.6 + 0.4 * ((ratio - 0.4) / 0.6);
+      }
       break;
-    case 3: // Hỏi (Dipping)
-      offset = ratio < 0.5 ? -0.4 * (ratio * 2) : -0.4 + 0.4 * ((ratio - 0.5) * 2);
+    case 4: // Ngã (Rising + glottal check)
+      offset = -0.2 + 0.9 * ratio;
       break;
-    case 4: // Ngã (Rising + glottal)
-      offset = 0.8 * ratio;
+    case 5: // Sắc (Rising contour)
+      offset = -0.1 + 0.8 * ratio;
+      break;
+    case 6: // Nặng (Low dipping/dropped boundary)
+      offset = -0.8 * ratio;
+      break;
+    default:
+      offset = 0;
+  }
+
+  // Tonal microtoning offset amplification based on phrase context & dynamic hooks
+  if (expression === 1) {
+    // Hỏi (Dipping + sharp)
+    offset = -0.8 * (1 - ratio) + 0.3 * ratio;
+  } else if (expression === 2) {
+    // Ngã (Rising + sharp check)
+    offset = -0.4 + 1.2 * ratio;
+  }
+
+  // Vietnamese phonetic tone check
+  switch (expression) {
+    case 3: // Hỏi (Dipping + breathy check)
+      offset = -0.9 * (1 - ratio);
+      break;
+    case 4: // Ngã (Rising + breathy check)
+      offset = -0.5 + 1.1 * ratio;
       break;
     case 5: // Nặng (Falling + sharp)
       offset = -0.7 * ratio;
       break;
     default:
-      offset = 0;
+      break;
   }
 
   // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
@@ -89,7 +130,7 @@ function calculateTonalOffset(
   return offset;
 }
 
-export function generateTimelineSvg(events: PhoneEvent[]): string {
+export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): string {
   if (events.length === 0) {
     return `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200" data-total-duration="0">
 	<rect width="100%" height="100%" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
@@ -440,7 +481,6 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
   });
 
   let f0PathSvg = "";
-  const decimationMarkers: string[] = [];
   if (f0Points.length > 0) {
     let currentSegment: Array<{ x: number; y: number }> = [];
     const paths: string[] = [];
@@ -468,6 +508,58 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
       .join("\n");
   }
 
+  let f0ActualSvg = "";
+  if (actualF0) {
+    const FRAME_DURATION = 0.01;
+    const f0ActualPoints: Array<{ x: number; y: number; isSilence: boolean }> = [];
+
+    for (let i = 0; i < actualF0.frames; i++) {
+      const hz = actualF0.values[i]!;
+      const time = i * FRAME_DURATION;
+      const time100ns = time * 10_000_000;
+      const xVal = getX(time100ns);
+
+      if (hz > 0) {
+        const midi = hzToMidi(hz);
+        const yVal = getY(midi);
+        f0ActualPoints.push({ x: xVal, y: yVal, isSilence: false });
+      } else {
+        f0ActualPoints.push({ x: xVal, y: 0, isSilence: true });
+      }
+    }
+
+    let currentSegment: Array<{ x: number; y: number }> = [];
+    const paths: string[] = [];
+
+    for (const pt of f0ActualPoints) {
+      if (pt.isSilence) {
+        if (currentSegment.length > 0) {
+          paths.push(buildBezierPath(currentSegment));
+          currentSegment = [];
+        }
+      } else {
+        currentSegment.push({ x: pt.x, y: pt.y });
+      }
+    }
+    if (currentSegment.length > 0) {
+      paths.push(buildBezierPath(currentSegment));
+    }
+
+    const f0Paths = paths
+      .map(
+        (d) => `
+		<path d="${d}" />
+		`,
+      )
+      .join("\n");
+
+    f0ActualSvg = `
+	<g id="f0-actual-layer">
+		${f0Paths}
+	</g>
+	`;
+  }
+
   // 7. Time ticks on the X axis
   const timeLabels: string[] = [];
   const step = totalTime / 20;
@@ -481,7 +573,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 		`);
   }
 
-  const svgContent = `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" data-total-duration="${(totalTime / 10_000_000).toFixed(4)}">
+  const svgContent = `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" data-total-duration="${(totalTime / 10_000_000).toFixed(4)}" data-min-midi="${minMidi}" data-max-midi="${maxMidi}" data-padding-top="${paddingTop}" data-padding-bottom="${paddingBottom}" data-padding-left="${paddingLeft}" data-padding-right="${paddingRight}" data-height="${height}" data-width="${width}">
 	<style>
 		text { user-select: none; }
 		.phone-event { transition: transform 0.1s ease; cursor: pointer; will-change: transform; }
@@ -491,6 +583,7 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 		.note-block.active { filter: drop-shadow(0 0 4px #db2777); }
 		#cursor { transition: x1 0.05s linear, x2 0.05s linear; pointer-events: none; will-change: x1, x2; }
 		#piano-head { will-change: transform; }
+		#f0-actual-layer path { stroke: #22c55e; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; opacity: 0.85; }
 	</style>
 	<!-- Pure White background (W3C Compliant & Light Mode) -->
 	<rect width="100%" height="100%" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
@@ -512,6 +605,9 @@ export function generateTimelineSvg(events: PhoneEvent[]): string {
 
 	<!-- Continuous Semi-transparent F0 Line -->
 	${f0PathSvg}
+
+	<!-- Pre-rendered Actual F0 Layer -->
+	${f0ActualSvg}
 	<!-- Active MIDI Note Lyric Texts -->
 	${noteTexts.join("")}
 
