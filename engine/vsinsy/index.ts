@@ -36,6 +36,7 @@ export interface SinsyPipelineOptions {
   fullEmitter?: LabelEmitter;
   phraseOverrideText?: string | null;
   phraseOverrideOptions?: PhonePlanParseOptions;
+  phonemeOverrides?: Record<string, string[]>;
   quiet?: boolean;
   noSvg?: boolean;
 }
@@ -61,6 +62,7 @@ export class SinsyLabelPipeline {
   private readonly fullEmitter: LabelEmitter;
   private readonly phraseOverrideText: string | null;
   private readonly phraseOverrideOptions: PhonePlanParseOptions;
+  private readonly phonemeOverrides: Record<string, string[]> | null;
   private readonly quiet: boolean;
   private readonly noSvg: boolean;
 
@@ -73,6 +75,7 @@ export class SinsyLabelPipeline {
     this.fullEmitter = options.fullEmitter ?? new SinsyFullLabelEmitter();
     this.phraseOverrideText = options.phraseOverrideText ?? null;
     this.phraseOverrideOptions = options.phraseOverrideOptions ?? {};
+    this.phonemeOverrides = options.phonemeOverrides ?? null;
     this.quiet = options.quiet ?? false;
     this.noSvg = options.noSvg ?? false;
   }
@@ -87,6 +90,14 @@ export class SinsyLabelPipeline {
 
   serializeTrace(xml: string, sourceName?: string): SinsySerializationTrace {
     const score = this.normalizer.normalize(this.parser.parse(xml, sourceName));
+    if (this.phonemeOverrides) {
+      for (const note of score.notes) {
+        const override = this.phonemeOverrides[note.id];
+        if (override) {
+          note.carriedPhones = override;
+        }
+      }
+    }
     let phraseOverrideWarnings: string[] = [];
     let phraseOverrideApplied = 0;
     let lyricTranspiler = this.lyricTranspiler ?? new VietnameseMoraPlanTranspiler();
@@ -370,6 +381,7 @@ export * from "./lab/mora-plan.ts";
 export * from "./lab/phoneme.ts";
 export * from "./lab/phrase-override.ts";
 export * from "./lab/phrase-override-hooks.ts";
+export * from "./lab/phone-plan.ts";
 export * from "./lab/timing.ts";
 export * from "./lab/transpiler.ts";
 export * from "./mxl/voice-select.ts";
