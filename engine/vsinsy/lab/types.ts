@@ -48,10 +48,11 @@ export interface ScoreNote {
   isGrace: boolean;
   isCue: boolean;
   isPrintable: boolean;
-  lyric: string | null;
-  codaSuppress?: boolean;
-  carriedPhones: string[] | null;
-  carriedTone: number | null;
+	lyric: string | null;
+	codaSuppress?: boolean;
+	carriedPhones?: string[] | null;
+	carriedPlan?: TimedPhonePlan[] | null;
+	carriedTone?: number | null;
   syllabic: "single" | "begin" | "middle" | "end" | null;
   pitch: ScorePitch | null;
   tie: "start" | "stop" | "continue" | null;

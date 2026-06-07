@@ -160,12 +160,17 @@ function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): strin
 }
 
 function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPhonePlan[] {
-  if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
-  if (note.carriedPhones) {
-    let plan = phonesToPlan(note.carriedPhones);
-    if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
-    return plan;
-  }
+	if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
+	if (note.carriedPlan) {
+		let plan = note.carriedPlan;
+		if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
+		return plan;
+	}
+	if (note.carriedPhones) {
+		let plan = phonesToPlan(note.carriedPhones);
+		if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
+		return plan;
+	}
 
   let plan: TimedPhonePlan[];
   if (note.lyric && isRoleAware(lyricTranspiler)) {
@@ -188,13 +193,20 @@ function isRoleAware(
   return "plan" in lyricTranspiler && typeof lyricTranspiler.plan === "function";
 }
 
+function isVowelPhone(phone: string): boolean {
+	return ["a", "i", "u", "e", "o"].includes(phone);
+}
+
 function phonesToPlan(phones: string[]): TimedPhonePlan[] {
-  const anchor = phones.findIndex((phone) => ["a", "i", "u", "e", "o"].includes(phone));
-  return phones.map((phone, index) => ({
-    phone,
-    role: anchor < 0 ? "tail" : index < anchor ? "pre" : index === anchor ? "anchor" : "tail",
-    weight: 1,
-  }));
+	const firstAnchor = phones.findIndex((phone) => isVowelPhone(phone));
+	return phones.map((phone, index) => ({
+		phone,
+		role: firstAnchor < 0 ? "tail"
+			: index < firstAnchor ? "pre"
+			: isVowelPhone(phone) ? "anchor"
+			: "tail",
+		weight: 1,
+	}));
 }
 
 function assignPhoneWindows(
