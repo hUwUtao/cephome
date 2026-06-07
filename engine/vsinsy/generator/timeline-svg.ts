@@ -1,4 +1,5 @@
-import type { PhoneEvent } from "../lab/types.ts";
+import { expressionForNote } from "../lab/expression.ts";
+import type { PhoneEvent, ScoreNote } from "../lab/types.ts";
 import type { F0Data } from "../../vneuvis/types.ts";
 import { hzToMidi } from "../../vneuvis/f0.ts";
 
@@ -9,125 +10,13 @@ function midiToNoteName(midi: number): string {
   return `${name}${octave}`;
 }
 
-function dynamicScaleFactor(dynamic: string): number {
-  switch (dynamic) {
-    case "pppp":
-      return 0.2;
-    case "ppp":
-      return 0.4;
-    case "pp":
-      return 0.6;
-    case "p":
-      return 0.8;
-    case "mp":
-      return 0.95;
-    case "mf":
-      return 1.0;
-    case "f":
-      return 1.1;
-    case "ff":
-      return 1.25;
-    case "fff":
-      return 1.4;
-    case "ffff":
-      return 1.6;
-    default:
-      return 1.0;
+function distinctNote(events: PhoneEvent[], index: number, direction: -1 | 1): ScoreNote | null {
+  const currentId = events[index]!.note.id;
+  for (let cursor = index + direction; cursor >= 0 && cursor < events.length; cursor += direction) {
+    const note = events[cursor]!.note;
+    if (note.id !== currentId && !note.isRest) return note;
   }
-}
-
-function calculateTonalOffset(
-  tone: number,
-  index: number,
-  count: number,
-  dynamic: string,
-  expression: number,
-): number {
-  if (tone === 0 || count === 0) return 0;
-
-  // Pitch envelope profile based on tone class
-  // 1: Ngang (flat/high)
-  // 2: Huyền (falling)
-  // 3: Hỏi (dipping)
-  // 4: Ngã (rising glottalized)
-  // 5: Sắc (rising)
-  // 6: Nặng (low dropping)
-  const ratio = index / count;
-  let offset = 0;
-
-  switch (tone) {
-    case 1: // Ngang (Flat, high-ish pitch center)
-      offset = 0.2;
-      break;
-    case 2: // Huyền (Gradual fall)
-      offset = -0.5 * ratio;
-      break;
-    case 3: // Hỏi (Dipping: starts low, dips further, recovers slightly)
-      if (ratio < 0.4) {
-        offset = -0.6 * (ratio / 0.4);
-      } else {
-        offset = -0.6 + 0.4 * ((ratio - 0.4) / 0.6);
-      }
-      break;
-    case 4: // Ngã (Rising + glottal check)
-      offset = -0.2 + 0.9 * ratio;
-      break;
-    case 5: // Sắc (Rising contour)
-      offset = -0.1 + 0.8 * ratio;
-      break;
-    case 6: // Nặng (Low dipping/dropped boundary)
-      offset = -0.8 * ratio;
-      break;
-    default:
-      offset = 0;
-  }
-
-  // Tonal microtoning offset amplification based on phrase context & dynamic hooks
-  if (expression === 1) {
-    // Hỏi (Dipping + sharp)
-    offset = -0.8 * (1 - ratio) + 0.3 * ratio;
-  } else if (expression === 2) {
-    // Ngã (Rising + sharp check)
-    offset = -0.4 + 1.2 * ratio;
-  }
-
-  // Vietnamese phonetic tone check
-  switch (expression) {
-    case 3: // Hỏi (Dipping + breathy check)
-      offset = -0.9 * (1 - ratio);
-      break;
-    case 4: // Ngã (Rising + breathy check)
-      offset = -0.5 + 1.1 * ratio;
-      break;
-    case 5: // Nặng (Falling + sharp)
-      offset = -0.7 * ratio;
-      break;
-    default:
-      break;
-  }
-
-  // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
-  const scale = dynamicScaleFactor(dynamic);
-  offset *= scale;
-
-  // Head/Tail assists (Attack overshoot / release decay)
-  const isLoud = ["f", "ff", "fff", "ffff"].includes(dynamic);
-  const isSoft = ["p", "pp", "ppp", "pppp"].includes(dynamic);
-  if (index === 0) {
-    // Head (Attack)
-    if (isLoud) {
-      offset += 0.25 * (dynamic === "ffff" ? 1.6 : 1.0); // sharp attack overshoot
-    } else if (isSoft) {
-      offset -= 0.15 * (dynamic === "pppp" ? 1.6 : 1.0); // soft scoop
-    }
-  } else if (index === count - 1) {
-    // Tail (Decay)
-    if (isSoft) {
-      offset -= 0.35 * (dynamic === "pppp" ? 1.8 : 1.0); // deeper release decay fall
-    }
-  }
-
-  return offset;
+  return null;
 }
 
 export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): string {
@@ -436,7 +325,7 @@ export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): st
     nextMidiSvg.set(note.id, next);
   }
 
-  events.forEach((event) => {
+  events.forEach((event, index) => {
     const x1 = getX(event.start);
     const x2 = getX(event.end);
     const isSilence = event.phoneme === "pau" || event.phoneme === "br";
@@ -452,14 +341,16 @@ export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): st
         pitchMidi = baseMidi + (nextMidi - baseMidi) * event.decimationEase!;
       }
 
-      const offset = calculateTonalOffset(
+      const gauge = expressionForNote(
+        event.note,
+        distinctNote(events, index, -1),
+        distinctNote(events, index, 1),
         event.tone,
         event.phoneIndexInNote,
         event.phoneCountInNote,
-        event.note.dynamic,
-        event.note.expression,
+        event.velocity,
       );
-      const actualPitch = pitchMidi + offset;
+      const actualPitch = pitchMidi + gauge.tonalPitchOffset;
       const yVal = getY(actualPitch);
 
       f0Points.push({ x: x1, y: yVal, isSilence: false, isDecimation });

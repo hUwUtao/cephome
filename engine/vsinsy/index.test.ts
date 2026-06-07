@@ -450,6 +450,7 @@ tôi t | o | i
   expect(result.events.map((event) => event.phoneme)).toEqual([
     "d",
     "o",
+    "o",
     "N",
     "ch",
     "a",
@@ -476,6 +477,7 @@ trên ty z | e | N
   expect(result.events.some((event) => event.vacuum)).toBe(false);
   expect(result.events.map((event) => event.phoneme)).toEqual([
     "z",
+    "u",
     "u",
     "N",
     "g",

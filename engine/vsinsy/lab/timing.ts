@@ -140,7 +140,9 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
     }
 
     return applyVowelDecimationSplit(
-      collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+      applyNoteDecimationSplit(
+        collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+      ),
     );
   }
 }
@@ -467,6 +469,78 @@ function applyVowelDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
     out.push({ ...event, start: transStart, end: transEnd, decimationEase: easeInOutCubic(0.5) });
     // Tail segment — last moment still at start pitch, engine begins the ramp here
     out.push({ ...event, start: transEnd });
+  }
+
+  return renumberPhoneIndexes(out);
+}
+
+/**
+ * Feature 3 – Note Decimation (Subdivision) for Tonal Swing.
+ *
+ * When a vowel anchor is long enough and has a tone (eligible for tonal F0
+ * swing), subdivide it into multiple sub-segments. Each sub-segment gets its
+ * own phoneIndexInNote / phoneCountInNote, so `calculateTonalOffset` produces
+ * a differentiated microtonal offset per segment, creating a more expressive
+ * tonal contour within a sustained vowel.
+ *
+ * Conditions:
+ * - Vowel anchor (role="anchor", cls="v")
+ * - Not ghost, not rest, has pitch
+ * - Has a non-zero tone (1–5, eligible for tonal swing)
+ * - Duration exceeds the note-relative threshold
+ */
+const NOTE_DECIMATION_MIN_TICKS = 3_500_000; // 350 ms minimum for subdivision
+const NOTE_DECIMATION_SEGMENT_TARGET_TICKS = 2_500_000; // ~250 ms per target segment
+const NOTE_DECIMATION_MAX_SEGMENTS = 6;
+
+export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
+  const out: PhoneEvent[] = [];
+
+  for (const event of events) {
+    if (
+      event.cls !== "v" ||
+      event.role !== "anchor" ||
+      event.ghost ||
+      event.note.isRest ||
+      !event.note.pitch ||
+      event.tone < 1 ||
+      event.tone > 5
+    ) {
+      out.push(event);
+      continue;
+    }
+
+    const duration = event.end - event.start;
+    if (duration < NOTE_DECIMATION_MIN_TICKS) {
+      out.push(event);
+      continue;
+    }
+
+    const desiredCount = Math.max(
+      2,
+      Math.round(duration / NOTE_DECIMATION_SEGMENT_TARGET_TICKS),
+    );
+    const actualCount = Math.min(desiredCount, NOTE_DECIMATION_MAX_SEGMENTS);
+
+    if (actualCount <= 1) {
+      out.push(event);
+      continue;
+    }
+
+    // Distribute segment durations using ease-in-out cubic for a natural S-curve swing
+    const boundaries: number[] = [];
+    for (let i = 0; i <= actualCount; i++) {
+      boundaries.push(Math.round(easeInOutCubic(i / actualCount) * duration));
+    }
+    boundaries[actualCount] = duration;
+
+    for (let i = 0; i < actualCount; i++) {
+      out.push({
+        ...event,
+        start: event.start + boundaries[i]!,
+        end: event.start + boundaries[i + 1]!,
+      });
+    }
   }
 
   return renumberPhoneIndexes(out);
