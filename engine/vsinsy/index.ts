@@ -5,9 +5,9 @@ import { VowelAnchoredTimingStrategy } from "./lab/timing.ts";
 import { VietnameseMoraPlanTranspiler } from "./lab/mora-plan.ts";
 import { VocalLineNormalizer } from "./mxl/voice-select.ts";
 import {
-	buildPhraseOverrideText,
-	parseLyricOverride,
-	phraseOverrideDictionaryFromText,
+  buildPhraseOverrideText,
+  parseLyricOverride,
+  phraseOverrideDictionaryFromText,
 } from "./lab/phrase-override.ts";
 import { generateTimelineSvg } from "./generator/timeline-svg.ts";
 import { generateInteractivePlayerHtml } from "./generator/player-template.ts";
@@ -91,26 +91,26 @@ export class SinsyLabelPipeline {
   }
 
   serializeTrace(xml: string, sourceName?: string): SinsySerializationTrace {
-	const score = this.normalizer.normalize(this.parser.parse(xml, sourceName));
-	if (this.phonemeOverrides) {
-		for (const note of score.notes) {
-			const override = this.phonemeOverrides[note.id];
-			if (override) {
-				if (override.length === 1 && override[0]!.includes("|")) {
-					const meta = note.lyric ? metadataForLyric(note.lyric) : undefined;
-					const plan = parseLyricOverride(override[0]!, meta);
-					if (plan) {
-						note.carriedPlan = plan;
-						note.carriedPhones = plan.map((item) => item.phone);
-					} else {
-						note.carriedPhones = override;
-					}
-				} else {
-					note.carriedPhones = override;
-				}
-			}
-		}
-	}
+    const score = this.normalizer.normalize(this.parser.parse(xml, sourceName));
+    if (this.phonemeOverrides) {
+      for (const note of score.notes) {
+        const override = this.phonemeOverrides[note.id];
+        if (override) {
+          if (override.length === 1 && override[0]!.includes("|")) {
+            const meta = note.lyric ? metadataForLyric(note.lyric) : undefined;
+            const plan = parseLyricOverride(override[0]!, meta);
+            if (plan) {
+              note.carriedPlan = plan;
+              note.carriedPhones = plan.map((item) => item.phone);
+            } else {
+              note.carriedPhones = override;
+            }
+          } else {
+            note.carriedPhones = override;
+          }
+        }
+      }
+    }
     let phraseOverrideWarnings: string[] = [];
     let phraseOverrideApplied = 0;
     let lyricTranspiler = this.lyricTranspiler ?? new VietnameseMoraPlanTranspiler();
@@ -399,4 +399,5 @@ export * from "./lab/timing.ts";
 export * from "./lab/transpiler.ts";
 export * from "./mxl/voice-select.ts";
 export * from "./lab/flat-tts.ts";
+export * from "./midi/index.ts";
 export type * from "./lab/types.ts";

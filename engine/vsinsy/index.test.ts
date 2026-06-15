@@ -10,6 +10,7 @@ import {
   VietnameseSinsyLyricTranspiler,
   VocalLineNormalizer,
   expressionForNote,
+  parseMidiToScore,
 } from "./index.ts";
 import { parseMusicXmlToLabelArgs, runMusicXmlToLabelAsync } from "./bin/musicXMLtoLabel.ts";
 import { transcribe as transcribeRule } from "./bin/rule-api.ts";
@@ -232,6 +233,48 @@ function scoreWithLyrics(lyrics: string[]): string {
 </score-partwise>`;
 }
 
+function midiFile(trackEvents: number[]): Uint8Array {
+  const header = [
+    ...asciiBytes("MThd"),
+    0x00,
+    0x00,
+    0x00,
+    0x06,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x01,
+    0xe0,
+  ];
+  return new Uint8Array([
+    ...header,
+    ...asciiBytes("MTrk"),
+    ...uint32Bytes(trackEvents.length),
+    ...trackEvents,
+  ]);
+}
+
+function asciiBytes(text: string): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < text.length; i++) out.push(text.charCodeAt(i));
+  return out;
+}
+
+function uint32Bytes(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
+
+function vlq(value: number): number[] {
+  const bytes = [value & 0x7f];
+  value >>= 7;
+  while (value > 0) {
+    bytes.unshift((value & 0x7f) | 0x80);
+    value >>= 7;
+  }
+  return bytes;
+}
+
 test("MusicXML parser builds note data structure", () => {
   const score = new DomMusicXmlParser().parse(SIMPLE_XML, "simple.musicxml");
   expect(score.divisions).toBe(2);
@@ -240,6 +283,145 @@ test("MusicXML parser builds note data structure", () => {
   expect(score.notes[0]?.pitch?.midi).toBe(60);
   expect(score.notes[0]?.beat).toEqual({ beats: 2, beatType: 4 });
   expect(score.notes[1]?.isRest).toBe(true);
+});
+
+test("MIDI parser reads note events into score notes", () => {
+  const midi = midiFile([
+    0x00,
+    0xff,
+    0x51,
+    0x03,
+    0x07,
+    0xa1,
+    0x20,
+    0x00,
+    0x90,
+    0x3c,
+    0x40,
+    ...vlq(480),
+    0x80,
+    0x3c,
+    0x00,
+    0x00,
+    0x90,
+    0x3e,
+    0x70,
+    ...vlq(240),
+    0x90,
+    0x3e,
+    0x00,
+    0x00,
+    0xff,
+    0x2f,
+    0x00,
+  ]);
+
+  const score = parseMidiToScore(midi, { sourceName: "tiny.mid", lyrics: ["mây", "trôi"] });
+
+  expect(score.sourceName).toBe("tiny.mid");
+  expect(score.divisions).toBe(480);
+  expect(score.notes.map((note) => note.pitch?.midi)).toEqual([60, 62]);
+  expect(score.notes.map((note) => [note.startDiv, note.endDiv])).toEqual([
+    [0, 480],
+    [480, 720],
+  ]);
+  expect(score.notes.map((note) => note.lyric)).toEqual(["mây", "trôi"]);
+  expect(score.notes[0]?.tempo).toBe(120);
+  expect(score.notes[1]?.dynamic).toBe("ff");
+});
+
+test("MIDI parser supports running status note events", () => {
+  const midi = midiFile([0x00, 0x90, 0x3c, 0x40, ...vlq(120), 0x3c, 0x00, 0x00, 0xff, 0x2f, 0x00]);
+
+  const score = parseMidiToScore(midi, { lyrics: ["la"] });
+
+  expect(score.notes).toHaveLength(1);
+  expect(score.notes[0]?.pitch?.name).toBe("C4");
+  expect(score.notes[0]?.durationDiv).toBe(120);
+});
+
+test("MusicXML parser unrolls repeats with two-line lyrics", () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice>
+        <lyric number="1"><text>mây</text></lyric>
+        <lyric number="2"><text>gió</text></lyric>
+      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice>
+        <lyric number="1"><text>trôi</text></lyric>
+        <lyric number="2"><text>qua</text></lyric>
+      </note>
+      <barline location="right"><repeat direction="backward"/></barline>
+    </measure>
+  </part>
+</score-partwise>`;
+
+  const score = new DomMusicXmlParser().parse(xml);
+
+  expect(score.notes.map((note) => note.lyric)).toEqual(["mây", "trôi", "gió", "qua"]);
+  expect(score.notes.map((note) => note.startDiv)).toEqual([0, 2, 4, 6]);
+});
+
+test("MusicXML parser unrolls volta endings", () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>một</text></lyric></note>
+    </measure>
+    <measure number="2">
+      <barline location="left"><ending number="1" type="start"/></barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>hai</text></lyric></note>
+      <barline location="right"><ending number="1" type="stop"/><repeat direction="backward"/></barline>
+    </measure>
+    <measure number="3">
+      <barline location="left"><ending number="2" type="start"/></barline>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>ba</text></lyric></note>
+      <barline location="right"><ending number="2" type="stop"/></barline>
+    </measure>
+  </part>
+</score-partwise>`;
+
+  const score = new DomMusicXmlParser().parse(xml);
+
+  expect(score.notes.map((note) => note.lyric)).toEqual(["một", "hai", "một", "ba"]);
+});
+
+test("MusicXML parser unrolls dacapo jumps to fine", () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>2</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>đầu</text></lyric></note>
+    </measure>
+    <measure number="2">
+      <direction><sound fine="yes"/></direction>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>fine</text></lyric></note>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice><lyric><text>cuối</text></lyric></note>
+      <direction><sound dacapo="yes"/></direction>
+    </measure>
+  </part>
+</score-partwise>`;
+
+  const score = new DomMusicXmlParser().parse(xml);
+
+  expect(score.notes.map((note) => note.lyric)).toEqual(["đầu", "fine", "cuối", "đầu", "fine"]);
 });
 
 test("MusicXML parser keeps accidental pitch names separator-safe", () => {
@@ -319,9 +501,9 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   const mono = new MonoLabelEmitter().emit(events);
   expect(mono).toBe(
     [
-      "0 400000 k",
-      "400000 2368750 i",
-      "2368750 5650000 e",
+      "0 413793 k",
+      "413793 600000 i",
+      "600000 5650000 e",
       "5650000 6105000 N",
       "6105000 12000000 pau",
       "",
@@ -329,18 +511,20 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   );
 });
 
-test("vowel-anchored timing prefires leading van against previous lingering tail", () => {
+test("vowel-anchored timing prefires leading head before the vowel boundary", () => {
   const score = new DomMusicXmlParser().parse(ADJACENT_XML);
   const events = new VowelAnchoredTimingStrategy().toPhoneEvents(
     score,
     new VietnameseMoraPlanTranspiler(),
   );
   const secondOnset = events.find((event) => event.note.lyric === "dạ" && event.phoneme === "z");
+  const secondVowel = events.find((event) => event.note.lyric === "dạ" && event.phoneme === "a");
   const previousTail = events.find((event) => event.note.lyric === "kiên" && event.phoneme === "N");
 
-  expect(secondOnset?.start).toBe(5820000);
-  expect(secondOnset?.end).toBe(6220000);
-  expect(previousTail?.end).toBe(5820000);
+  expect(secondOnset?.start).toBe(5600000);
+  expect(secondOnset?.end).toBe(6000000);
+  expect(secondVowel?.start).toBe(6000000);
+  expect(previousTail?.end).toBe(5600000);
 });
 
 test("timing does not turn missing lyric pitched notes into pau", () => {
@@ -365,7 +549,7 @@ test("MusicXML dynamics and articulation feed expression gauges", () => {
 
 test("pipeline emits mono and full labels", () => {
   const result = new SinsyLabelPipeline().serialize(SIMPLE_XML);
-  expect(result.mono.startsWith("0 400000 k\n")).toBe(true);
+  expect(result.mono.startsWith("0 413793 k\n")).toBe(true);
   expect(result.full).toContain("/E:C4]0^0=2/4~100");
   expect(result.full).toContain("/F:xx#xx#xx-xx$xx$xx+xx%xx;");
 });
@@ -493,7 +677,7 @@ trên ty z | e | N
 
 test("rule API decodes MusicXML bytes", async () => {
   const result = await transcribeRule(new TextEncoder().encode(SIMPLE_XML), "simple.musicxml");
-  expect(result.mono).toContain("0 400000 k");
+  expect(result.mono).toContain("0 413793 k");
   expect(result.full).toContain("/E:C4]0^0=2/4~100");
 });
 test("musicXMLtoLabel CLI parses NEUTRINO positional args", () => {
@@ -528,7 +712,7 @@ test("musicXMLtoLabel runner writes full and mono files", async () => {
 
     await runMusicXmlToLabelAsync({ inputPath: input, fullLabelPath: full, monoLabelPath: mono });
 
-    expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
+    expect(readFileSync(mono, "utf8")).toContain("0 413793 k");
     expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
     expect(statSync(join(dir, "score", "label", "timing")).isDirectory()).toBe(true);
   } finally {
@@ -629,7 +813,7 @@ test("musicXMLtoLabel accepts Windows-style separators on POSIX", async () => {
     });
 
     expect(readFileSync(full, "utf8")).toContain("/E:C4]0^0=2/4~100");
-    expect(readFileSync(mono, "utf8")).toContain("0 400000 k");
+    expect(readFileSync(mono, "utf8")).toContain("0 413793 k");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -47,7 +47,8 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
       const vowelWeight = isShortVowel ? 0.5 : 1.0;
       const dominantPhone = getDominantVowelPhone(nucleus);
       const isDiphthong = nucleus.length > 1;
-      nucleus.forEach((phone) => {
+      const dominantIndex = nucleus.findIndex((phone) => phone === dominantPhone);
+      nucleus.forEach((phone, index) => {
         if (phone === dominantPhone) {
           plan.push({
             phone,
@@ -55,12 +56,10 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
             weight: 1.0 * vowelWeight,
           });
         } else if (this.mode === "singing" && isDiphthong) {
-          // Diphthong companions get fair weight in singing mode
-          // so each vowel gets meaningful time, not ghost scraps
           plan.push({
             phone,
-            role: "anchor",
-            weight: 0.6 * vowelWeight,
+            role: index < dominantIndex ? "pre" : "tail",
+            weight: 0.45 * vowelWeight,
           });
         } else {
           plan.push({

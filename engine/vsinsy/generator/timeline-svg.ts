@@ -19,6 +19,18 @@ function distinctNote(events: PhoneEvent[], index: number, direction: -1 | 1): S
   return null;
 }
 
+function ticksForDivs(divs: number, note: { divisions: number; tempo: number }): number {
+  return Math.round((divs * 600_000_000) / (note.divisions * note.tempo));
+}
+
+function scoreStartTicks(note: ScoreNote): number {
+  return ticksForDivs(note.startDiv, note);
+}
+
+function scoreEndTicks(note: ScoreNote): number {
+  return ticksForDivs(note.endDiv, note);
+}
+
 export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): string {
   if (events.length === 0) {
     return `<svg id="timeline-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200" data-total-duration="0">
@@ -125,8 +137,9 @@ export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): st
   events.forEach((event) => {
     if (event.note && event.note.measureNumber) {
       const mNum = event.note.measureNumber;
-      if (!measureStartTimes.has(mNum) || event.start < measureStartTimes.get(mNum)!) {
-        measureStartTimes.set(mNum, event.start);
+      const scoreStart = scoreStartTicks(event.note);
+      if (!measureStartTimes.has(mNum) || scoreStart < measureStartTimes.get(mNum)!) {
+        measureStartTimes.set(mNum, scoreStart);
       }
       if (!measureNotes.has(mNum)) {
         measureNotes.set(mNum, []);
@@ -190,8 +203,8 @@ export function generateTimelineSvg(events: PhoneEvent[], actualF0?: F0Data): st
   uniqueNotes.forEach((note) => {
     const noteEvents = events.filter((e) => e.note.id === note.id);
     if (noteEvents.length > 0) {
-      const nStart = noteEvents[0]!.start;
-      const nEnd = noteEvents[noteEvents.length - 1]!.end;
+      const nStart = scoreStartTicks(note);
+      const nEnd = scoreEndTicks(note);
       const x1 = getX(nStart);
       const x2 = getX(nEnd);
       const y = getY(note.pitch!.midi);

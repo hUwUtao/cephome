@@ -60,7 +60,6 @@ export interface VowelAnchoredTimingOptions {
   maxGhostRatio: number;
   maxVacuumSeconds: number;
   maxVacuumRatio: number;
-  prefireStrength: number;
   lingerRatio: number;
   maxLingerSeconds: number;
   tailSteal: number;
@@ -80,7 +79,6 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       maxGhostRatio: options.maxGhostRatio ?? 0.08,
       maxVacuumSeconds: options.maxVacuumSeconds ?? 0.004,
       maxVacuumRatio: options.maxVacuumRatio ?? 0.02,
-      prefireStrength: options.prefireStrength ?? 0.45,
       lingerRatio: options.lingerRatio ?? 0.18,
       maxLingerSeconds: options.maxLingerSeconds ?? 0.08,
       tailSteal: options.tailSteal ?? 0.6,
@@ -147,17 +145,17 @@ function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): strin
 }
 
 function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPhonePlan[] {
-	if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
-	if (note.carriedPlan) {
-		let plan = note.carriedPlan;
-		if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
-		return plan;
-	}
-	if (note.carriedPhones) {
-		let plan = phonesToPlan(note.carriedPhones);
-		if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
-		return plan;
-	}
+  if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
+  if (note.carriedPlan) {
+    let plan = note.carriedPlan;
+    if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
+    return plan;
+  }
+  if (note.carriedPhones) {
+    let plan = phonesToPlan(note.carriedPhones);
+    if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
+    return plan;
+  }
 
   let plan: TimedPhonePlan[];
   if (note.lyric && isRoleAware(lyricTranspiler)) {
@@ -181,19 +179,23 @@ function isRoleAware(
 }
 
 function isVowelPhone(phone: string): boolean {
-	return ["a", "i", "u", "e", "o"].includes(phone);
+  return ["a", "i", "u", "e", "o"].includes(phone);
 }
 
 function phonesToPlan(phones: string[]): TimedPhonePlan[] {
-	const firstAnchor = phones.findIndex((phone) => isVowelPhone(phone));
-	return phones.map((phone, index) => ({
-		phone,
-		role: firstAnchor < 0 ? "tail"
-			: index < firstAnchor ? "pre"
-			: isVowelPhone(phone) ? "anchor"
-			: "tail",
-		weight: 1,
-	}));
+  const firstAnchor = phones.findIndex((phone) => isVowelPhone(phone));
+  return phones.map((phone, index) => ({
+    phone,
+    role:
+      firstAnchor < 0
+        ? "tail"
+        : index < firstAnchor
+          ? "pre"
+          : isVowelPhone(phone)
+            ? "anchor"
+            : "tail",
+    weight: 1,
+  }));
 }
 
 function assignPhoneWindows(
@@ -271,11 +273,13 @@ function applyBoundaryPrefire(
       const pauseEvent = current[0]!;
       const lastDur = previousLast.end - previousLast.start;
       const pauseDur = pauseEvent.end - pauseEvent.start;
-      const tailFade = Math.floor(Math.min(
-        lastDur * 0.3,
-        pauseDur * 0.3,
-        500_000, // max 50ms
-      ));
+      const tailFade = Math.floor(
+        Math.min(
+          lastDur * 0.3,
+          pauseDur * 0.3,
+          500_000, // max 50ms
+        ),
+      );
       if (tailFade > 0) {
         previousLast.end = Math.min(previousLast.end + tailFade, pauseEvent.end);
         pauseEvent.start = Math.max(pauseEvent.start, previousLast.end);
@@ -299,23 +303,19 @@ function applyBoundaryPrefire(
       previousDuration * options.lingerRatio,
       options.maxLingerSeconds * 10_000_000,
     );
-    const prefire = Math.floor(
-      Math.min(preDuration * options.prefireStrength, lingerReserve * options.tailSteal),
-    );
+    const neededPrefire = Math.floor(preDuration);
 
-    if (prefire <= 0) continue;
+    if (neededPrefire <= 0) continue;
 
-    const previousLastDuration = previousLast.end - previousLast.start;
-    const protection = Math.min(previousLastDuration * 0.4, 200_000);
-    const safePrefire = Math.floor(
-      Math.min(prefire, Math.max(0, previousLastDuration - protection)),
-    );
+    const safePrefire = Math.floor(Math.min(neededPrefire, lingerReserve * options.tailSteal));
 
-    const newPreviousEnd = Math.max(previousLast.start + 1, boundary - safePrefire);
-    previousLast.end = Math.min(previousLast.end, newPreviousEnd);
+    if (safePrefire <= 0) continue;
+
+    const newPreviousEnd = boundary - safePrefire;
+    closeGroupAt(previous, newPreviousEnd);
 
     for (const event of current) {
-      event.start = Math.floor(Math.max(previousLast.end, event.start - safePrefire));
+      event.start = Math.floor(Math.max(newPreviousEnd, event.start - safePrefire));
       event.end = Math.floor(Math.max(event.start + 1, event.end - safePrefire));
     }
   }
@@ -325,6 +325,26 @@ function applyBoundaryPrefire(
     start: Math.floor(event.start),
     end: Math.floor(event.end),
   }));
+}
+
+function closeGroupAt(group: PhoneEvent[], end: number): void {
+  const last = group[group.length - 1];
+  if (!last) return;
+
+  if (last.end < end) {
+    last.end = Math.floor(end);
+    return;
+  }
+
+  let cursor = end;
+  for (let index = group.length - 1; index >= 0; index--) {
+    const event = group[index]!;
+    if (event.end <= cursor) break;
+
+    event.end = Math.floor(cursor);
+    if (event.start >= event.end) event.start = event.end - 1;
+    cursor = event.start;
+  }
 }
 
 function groupByNote(events: PhoneEvent[]): PhoneEvent[][] {
@@ -542,7 +562,8 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
       phaseEnd < group.length - 1 &&
       group[phaseEnd + 1]?.cls === "v" &&
       group[phaseEnd + 1]?.role !== "tail"
-    ) phaseEnd++;
+    )
+      phaseEnd++;
 
     const vowelPhase = group.slice(phaseStart, phaseEnd + 1);
     const duration = vowelPhase.reduce((sum, e) => sum + (e.end - e.start), 0);
@@ -567,7 +588,11 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
       // Only skip if the phone is trivially short (< 50ms — ghost scraps)
       const segs = phoneDur >= 500_000 ? 2 : 1;
       if (segs <= 1) {
-        out.push({ ...ve, start: phaseAnchor + phoneOffset, end: phaseAnchor + phoneOffset + phoneDur });
+        out.push({
+          ...ve,
+          start: phaseAnchor + phoneOffset,
+          end: phaseAnchor + phoneOffset + phoneDur,
+        });
         phoneOffset += phoneDur;
         continue;
       }
