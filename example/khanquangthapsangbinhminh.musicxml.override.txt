@@ -1,0 +1,120 @@
+# cephome pronunciation dictionary v1
+# Format: word pre | nucleus | tail
+# [] marks ghost/compressed phones. Run with --omit-ghost to drop bracketed phones.
+# !N sets velocity. Tailing / \ ? ~ . is accepted as a tone hint.
+# Example: khiên k h | i [w] e | n
+
+# [1] Kìa có con chim non
+Kìa k | [i] e |
+có k | o |
+con k | o | N
+chim ch | i | N
+non n | o | N
+
+# [2] chim chơi ở sân trường
+chơi ch | o [i] |
+ở  | o |
+sân [s] | a | N
+trường ch | [u] o | N g
+
+# [3] Ồ chú chim xinh đẹp hót chào mừng xuân
+Ồ  | o |
+chú ch | u |
+xinh s | i | N
+đẹp d | e | p
+hót h | o | t
+chào ch | a o |
+mừng m | u | N g
+xuân s w | a | N
+
+# [4] Kìa các em thơ ngây
+các k | a | k
+em  | e | N
+thơ t h | o |
+ngây n g | a i | y
+
+# [5] em luôn cùng kết đoàn
+luôn r | [u] o | N
+cùng k | u | N g
+kết k | e | t
+đoàn d | o a | N
+
+# [6] Vì các em đã thuộc năm điều Bác dạy
+Vì v | i |
+đã d | a | cl
+thuộc t h | [u] o | k
+năm n | a | N
+điều d | [i] e u |
+Bác b | a | k
+dạy z | a i | cl
+
+# [7] Học cho ngoan
+Học h | o | k
+cho ch [y] | o |
+ngoan n g | [u] a | N
+
+# [8] lớn cho nhanh
+lớn r | o | N
+nhanh ny | a | N
+
+# [9] Bay vào đời
+Bay b | a i |
+vào v | a o |
+đời d | o [i] |
+
+# [10] xây dựng
+xây s | a i | y
+dựng z | u | N g cl
+
+# [11] Rèn đôi tay
+Rèn z | e | N
+đôi d | o i |
+tay t | a i |
+
+# [12] chắc đôi chân
+chắc ch | a | k
+chân ch | a | N
+
+# [13] Lao động là
+Lao r | a o |
+động d | o | N g cl
+là r | a |
+
+# [14] vinh quang
+vinh v | i | N
+quang k w | a | N g
+
+# [15] Kìa các em xinh xinh
+
+# [16] Chân bước vội đến trường
+bước b | [u] o | k
+vội v | o i | cl
+đến d | e | N
+
+# [17] Từng chiếc khăn em quàng thắp đỏ bình minh
+Từng t | [w] u | N g
+chiếc ch | [i] e | k
+khăn k | a | N
+quàng k w | a | N g
+thắp t h | a | p
+đỏ d | o |
+bình b | i | N
+minh m | i | N N h cl
+
+# [18] Từng cánh tay măng non
+cánh k | a | N
+măng m | a | N g
+
+# [19] Đang xây ngày mai hồng
+Đang d | a | N [g]
+ngày n g | a i |
+mai m | a i |
+hồng h | o | N g
+
+# [20] Đoàn thiếu nhi em là hy vọng Việt Nam
+thiếu t h | [i] e u |
+nhi ny | i |
+hy h | i |
+vọng v | o | N g cl
+Việt v | [i] e | t
+Nam n | a | N

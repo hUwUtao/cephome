@@ -236,6 +236,14 @@ export async function generateInteractivePlayerHtml(
 			});
 		}
 
+		document.addEventListener('keydown', (e) => {
+			if (e.code === 'Space') {
+				e.preventDefault();
+				if (audio.paused) audio.play();
+				else audio.pause();
+			}
+		});
+
 		audio.addEventListener('loadedmetadata', () => {
 			timeDisplay.textContent = '0.000s / ' + totalDuration.toFixed(3) + 's';
 		});

@@ -320,10 +320,10 @@ test("vowel-anchored timing compresses onset and pushes coda to tail", () => {
   expect(mono).toBe(
     [
       "0 400000 k",
-      "400000 550000 i",
-      "550000 5650000 e",
-      "5650000 6000000 N",
-      "6000000 12000000 pau",
+      "400000 2368750 i",
+      "2368750 5650000 e",
+      "5650000 6105000 N",
+      "6105000 12000000 pau",
       "",
     ].join("\n"),
   );
@@ -388,7 +388,7 @@ test("pipeline applies phrase override as temporary dictionary entries", () => {
   expect(result.phraseOverrideWarnings).toEqual([]);
   expect(result.score.notes.find((note) => note.lyric === "kiên")?.lyric).toBe("kiên");
   expect(result.mono).toContain("0 400000 z");
-  expect(result.mono).toContain("400000 6000000 a");
+  expect(result.mono).toContain("400000 6500000 a");
   expect(result.events.map((event) => event.velocity)).toEqual([40, 110, undefined]);
   expect(result.full).toContain("=40@");
   expect(result.full).toContain("=110@");

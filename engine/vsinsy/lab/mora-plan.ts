@@ -46,12 +46,21 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
       const isShortVowel = ["ă", "â"].includes(parsed.nucleus);
       const vowelWeight = isShortVowel ? 0.5 : 1.0;
       const dominantPhone = getDominantVowelPhone(nucleus);
+      const isDiphthong = nucleus.length > 1;
       nucleus.forEach((phone) => {
         if (phone === dominantPhone) {
           plan.push({
             phone,
             role: "anchor",
             weight: 1.0 * vowelWeight,
+          });
+        } else if (this.mode === "singing" && isDiphthong) {
+          // Diphthong companions get fair weight in singing mode
+          // so each vowel gets meaningful time, not ghost scraps
+          plan.push({
+            phone,
+            role: "anchor",
+            weight: 0.6 * vowelWeight,
           });
         } else {
           plan.push({

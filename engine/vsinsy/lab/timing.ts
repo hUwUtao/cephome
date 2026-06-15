@@ -18,18 +18,10 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
     const notes = score.notes
       .filter((note) => !note.isChord)
       .sort((a, b) => a.startDiv - b.startDiv || a.id.localeCompare(b.id));
-    let seconds = 0;
-    let previousEndDiv = notes[0]?.startDiv ?? 0;
 
     for (const note of notes) {
-      if (note.startDiv > previousEndDiv) {
-        seconds += divsToSeconds(note.startDiv - previousEndDiv, note);
-      }
-
-      const start = Math.floor(seconds * 10_000_000);
-      seconds += divsToSeconds(note.durationDiv, note);
-      const end = Math.floor(seconds * 10_000_000);
-      previousEndDiv = note.endDiv;
+      const start = ticksForDivs(note.startDiv, note);
+      const end = ticksForDivs(note.endDiv, note);
 
       const phones = phonesForNote(note, lyricTranspiler);
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
@@ -100,18 +92,10 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
     const notes = score.notes
       .filter((note) => !note.isChord)
       .sort((a, b) => a.startDiv - b.startDiv || a.id.localeCompare(b.id));
-    let seconds = 0;
-    let previousEndDiv = notes[0]?.startDiv ?? 0;
 
     for (const note of notes) {
-      if (note.startDiv > previousEndDiv) {
-        seconds += divsToSeconds(note.startDiv - previousEndDiv, note);
-      }
-
-      const start = Math.floor(seconds * 10_000_000);
-      seconds += divsToSeconds(note.durationDiv, note);
-      const end = Math.floor(seconds * 10_000_000);
-      previousEndDiv = note.endDiv;
+      const start = ticksForDivs(note.startDiv, note);
+      const end = ticksForDivs(note.endDiv, note);
 
       const planResult = planForNote(note, lyricTranspiler);
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
@@ -147,8 +131,11 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
   }
 }
 
-function divsToSeconds(divs: number, note: ScoreNote): number {
-  return (divs / note.divisions) * (60 / note.tempo);
+function ticksForDivs(divs: number, note: { divisions: number; tempo: number }): number {
+  // (divs / divisions) * (60 / tempo) * 10_000_000
+  // = (divs * 600_000_000) / (divisions * tempo)
+  // Using integer arithmetic — no float accumulation.
+  return Math.round((divs * 600_000_000) / (note.divisions * note.tempo));
 }
 
 function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): string[] {
@@ -275,9 +262,26 @@ function applyBoundaryPrefire(
     const previousNote = previous[0]!.note;
     const currentNote = current[0]!.note;
 
-    if (previousNote.isRest || currentNote.isRest || currentNote.hasBreath) continue;
+    if (currentNote.hasBreath) continue;
 
     const previousLast = previous[previous.length - 1]!;
+
+    // Tail expansion: note's last phone extends into following pause for smooth fall
+    if (currentNote.isRest && !previousNote.isRest) {
+      const pauseEvent = current[0]!;
+      const lastDur = previousLast.end - previousLast.start;
+      const pauseDur = pauseEvent.end - pauseEvent.start;
+      const tailFade = Math.floor(Math.min(
+        lastDur * 0.3,
+        pauseDur * 0.3,
+        500_000, // max 50ms
+      ));
+      if (tailFade > 0) {
+        previousLast.end = Math.min(previousLast.end + tailFade, pauseEvent.end);
+        pauseEvent.start = Math.max(pauseEvent.start, previousLast.end);
+      }
+      continue;
+    }
 
     const preEvents = current.filter((event) => event.role === "pre");
     if (preEvents.length === 0) {
@@ -500,59 +504,95 @@ function applyVowelDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
  * - Not ghost, not rest, has pitch
  * - Has a non-zero tone (1–5, eligible for tonal swing)
  * - Duration exceeds the note-relative threshold
+ *
+ * Segment durations follow a progressive ramp (1:2:3:… weighting) so the
+ * first sub-segment is shortest (quick tonal departure) and later segments
+ * get progressively more settling time.
  */
 const NOTE_DECIMATION_MIN_TICKS = 3_500_000; // 350 ms minimum for subdivision
-const NOTE_DECIMATION_SEGMENT_TARGET_TICKS = 2_500_000; // ~250 ms per target segment
-const NOTE_DECIMATION_MAX_SEGMENTS = 6;
 
 export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
+  const groups = groupByNote(events);
   const out: PhoneEvent[] = [];
 
-  for (const event of events) {
-    if (
-      event.cls !== "v" ||
-      event.role !== "anchor" ||
-      event.ghost ||
-      event.note.isRest ||
-      !event.note.pitch ||
-      event.tone < 1 ||
-      event.tone > 5
-    ) {
-      out.push(event);
-      continue;
-    }
-
-    const duration = event.end - event.start;
-    if (duration < NOTE_DECIMATION_MIN_TICKS) {
-      out.push(event);
-      continue;
-    }
-
-    const desiredCount = Math.max(
-      2,
-      Math.round(duration / NOTE_DECIMATION_SEGMENT_TARGET_TICKS),
+  for (const group of groups) {
+    // Find the first eligible non-ghost vowel anchor
+    const eligibleIndex = group.findIndex(
+      (event) =>
+        event.cls === "v" &&
+        event.role === "anchor" &&
+        !event.ghost &&
+        !event.note.isRest &&
+        event.note.pitch &&
+        event.tone >= 1 &&
+        event.tone <= 5,
     );
-    const actualCount = Math.min(desiredCount, NOTE_DECIMATION_MAX_SEGMENTS);
 
-    if (actualCount <= 1) {
-      out.push(event);
+    if (eligibleIndex === -1) {
+      out.push(...group);
       continue;
     }
 
-    // Distribute segment durations using ease-in-out cubic for a natural S-curve swing
-    const boundaries: number[] = [];
-    for (let i = 0; i <= actualCount; i++) {
-      boundaries.push(Math.round(easeInOutCubic(i / actualCount) * duration));
-    }
-    boundaries[actualCount] = duration;
+    // Expand to the full vowel phase: all contiguous vowel-class phones
+    // (diphthong/triphthong companions) stopping before semivowel codas.
+    let phaseStart = eligibleIndex;
+    let phaseEnd = eligibleIndex;
+    while (phaseStart > 0 && group[phaseStart - 1]?.cls === "v") phaseStart--;
+    while (
+      phaseEnd < group.length - 1 &&
+      group[phaseEnd + 1]?.cls === "v" &&
+      group[phaseEnd + 1]?.role !== "tail"
+    ) phaseEnd++;
 
-    for (let i = 0; i < actualCount; i++) {
-      out.push({
-        ...event,
-        start: event.start + boundaries[i]!,
-        end: event.start + boundaries[i + 1]!,
-      });
+    const vowelPhase = group.slice(phaseStart, phaseEnd + 1);
+    const duration = vowelPhase.reduce((sum, e) => sum + (e.end - e.start), 0);
+
+    if (duration < NOTE_DECIMATION_MIN_TICKS) {
+      out.push(...group);
+      continue;
     }
+
+    // Pre-vowel events (onset consonants, etc.)
+    for (let i = 0; i < phaseStart; i++) out.push(group[i]!);
+
+    // Subdivided vowel phase — each vowel keeps its original
+    // weight-proportional time.  Only phones long enough get
+    // subdivided; short ghost vowels are emitted as-is.
+    const phaseAnchor = vowelPhase[0]!.start;
+    let phoneOffset = 0;
+
+    for (const ve of vowelPhase) {
+      const phoneDur = ve.end - ve.start;
+      // Double split per mora: split phone into 2 progressive sub-segments
+      // Only skip if the phone is trivially short (< 50ms — ghost scraps)
+      const segs = phoneDur >= 500_000 ? 2 : 1;
+      if (segs <= 1) {
+        out.push({ ...ve, start: phaseAnchor + phoneOffset, end: phaseAnchor + phoneOffset + phoneDur });
+        phoneOffset += phoneDur;
+        continue;
+      }
+
+      const pw = (segs * (segs + 1)) / 2;
+      const bounds: number[] = [0];
+      let cum = 0;
+      for (let i = 0; i < segs; i++) {
+        cum += i + 1;
+        bounds.push(Math.round((cum / pw) * phoneDur));
+      }
+      bounds[segs] = phoneDur;
+
+      for (let s = 0; s < segs; s++) {
+        out.push({
+          ...ve,
+          start: phaseAnchor + phoneOffset + bounds[s]!,
+          end: phaseAnchor + phoneOffset + bounds[s + 1]!,
+        });
+      }
+      phoneOffset += phoneDur;
+    }
+
+    // Post-vowel events (coda tails, breath, etc.)
+    for (let i = phaseEnd + 1; i < group.length; i++) out.push(group[i]!);
   }
 
   return renumberPhoneIndexes(out);

@@ -179,10 +179,11 @@ function inferRole(phone: string, index: number, anchorIndex: number): PhoneRole
 function roleForGroup(groupIndex: number, tokenIndex: number, anchorIndex: number): PhoneRole {
   if (groupIndex === 0) return "pre";
   if (groupIndex >= 2) return "tail";
+  // Nucleus group: anchor and all subsequent phones stay in the vowel
+  // phase — diphthong companions get anchor, not tail.
   if (anchorIndex === -1) return tokenIndex === 0 ? "anchor" : "tail";
   if (tokenIndex < anchorIndex) return "pre";
-  if (tokenIndex === anchorIndex) return "anchor";
-  return "tail";
+  return "anchor";
 }
 
 function defaultWeight(phone: string, role: PhoneRole, ghost: boolean): number {
