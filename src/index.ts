@@ -51,10 +51,16 @@ const server = serve({
           }
 
           let xmlContent: string;
-          if (body.musicxml.startsWith("/") || body.musicxml.startsWith("~") || body.musicxml.startsWith("C:")) {
+          if (
+            body.musicxml.startsWith("/") ||
+            body.musicxml.startsWith("~") ||
+            body.musicxml.startsWith("C:")
+          ) {
             const resolved = body.musicxml.replace(/^~/, process.env.HOME || "");
             if (!existsSync(resolved)) {
-              return new Response(JSON.stringify({ error: `File not found: ${resolved}` }), { status: 400 });
+              return new Response(JSON.stringify({ error: `File not found: ${resolved}` }), {
+                status: 400,
+              });
             }
             xmlContent = readFileSync(resolved, "utf8");
           } else {

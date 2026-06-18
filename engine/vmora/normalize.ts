@@ -4,11 +4,11 @@
  * - This is 'safe' because it preserves all semantic content while fixing encoding drift.
  */
 export function canonicalizeVietnamese(text: string): string {
-	if (!text) return "";
-	// Strip HTML tags MuseScore embeds in lyrics (e.g. <font face="..."/>)
-	const stripped = text.replace(/<[^>]*>/g, "").trim();
-	// NFC is the standard for modern Vietnamese web/mobile.
-	return stripped.normalize("NFC");
+  if (!text) return "";
+  // Strip HTML tags MuseScore embeds in lyrics (e.g. <font face="..."/>)
+  const stripped = text.replace(/<[^>]*>/g, "").trim();
+  // NFC is the standard for modern Vietnamese web/mobile.
+  return stripped.normalize("NFC");
 }
 
 /**

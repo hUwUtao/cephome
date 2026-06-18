@@ -4,23 +4,31 @@ import { VietnameseMoraPlanTranspiler } from "./mora-plan.ts";
 import { formatPhoneUnit, formatSimplePhoneGroups, parsePhoneGroups } from "./phone-plan.ts";
 import type { VietnameseDictionaryEntries } from "../dict/dictionary.ts";
 import type { PhonePlanParseOptions } from "./phone-plan.ts";
-import type { ScoreDocument, ScoreNote, TimedPhonePlan, VietnameseSyllableMetadata } from "./types.ts";
+import type {
+  ScoreDocument,
+  ScoreNote,
+  TimedPhonePlan,
+  VietnameseSyllableMetadata,
+} from "./types.ts";
 
 export function parseLyricOverride(
-	text: string,
-	metadata: VietnameseSyllableMetadata = DEFAULT_VIETNAMESE_METADATA,
+  text: string,
+  metadata: VietnameseSyllableMetadata = DEFAULT_VIETNAMESE_METADATA,
 ): TimedPhonePlan[] | null {
-	if (!text.includes("|")) return null;
-	const groups = text.split("|").map((g) => g.trim()).filter(Boolean);
-	if (groups.length < 2) return null;
-	const parsed = parsePhoneGroups(groups, metadata, "lyric-override");
-	return parsed.plan.length > 0 ? parsed.plan : null;
+  if (!text.includes("|")) return null;
+  const groups = text
+    .split("|")
+    .map((g) => g.trim())
+    .filter(Boolean);
+  if (groups.length < 2) return null;
+  const parsed = parsePhoneGroups(groups, metadata, "lyric-override");
+  return parsed.plan.length > 0 ? parsed.plan : null;
 }
 
 interface LyricPhrase {
-	index: number;
-	text: string;
-	notes: ScoreNote[];
+  index: number;
+  text: string;
+  notes: ScoreNote[];
 }
 
 export interface PhraseOverrideDictionary {
