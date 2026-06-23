@@ -46,7 +46,7 @@ export class CumulativeFloatTimingStrategy implements TimingStrategy {
       });
     }
 
-    return events;
+    return appendTrailingSilence(events);
   }
 }
 
@@ -121,9 +121,11 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       });
     }
 
-    return applyVowelDecimationSplit(
-      applyNoteDecimationSplit(
-        collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+    return appendTrailingSilence(
+      applyVowelDecimationSplit(
+        applyNoteDecimationSplit(
+          collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+        ),
       ),
     );
   }
@@ -621,6 +623,52 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
   }
 
   return renumberPhoneIndexes(out);
+}
+
+/** 1 second of trailing silence for gradual decay (100ns ticks) */
+const TRAILING_SILENCE_TICKS = 10_000_000;
+
+/** Maximum fade into trailing silence (300ms) */
+const TRAILING_FADE_MAX_TICKS = 3_000_000;
+
+/**
+ * Append ~1 second of silence after the last non-silence event
+ * so synthesized audio decays gradually instead of cutting off.
+ */
+export function appendTrailingSilence(events: PhoneEvent[]): PhoneEvent[] {
+  if (events.length === 0) return events;
+  const last = events[events.length - 1]!;
+  const isSilence = last.phoneme === "pau" || last.phoneme === "br" || last.phoneme === "sil";
+  if (isSilence) return events;
+
+  const fadeTicks = Math.min(
+    TRAILING_FADE_MAX_TICKS,
+    (last.end - last.start) * 0.5,
+    TRAILING_SILENCE_TICKS * 0.3,
+  );
+
+  const silenceStart = last.end;
+  const silenceEnd = silenceStart + TRAILING_SILENCE_TICKS;
+
+  if (fadeTicks > 0) {
+    last.end = Math.floor(silenceStart + fadeTicks);
+  }
+
+  events.push({
+    start: Math.floor(last.end),
+    end: Math.floor(silenceEnd),
+    phoneme: "pau",
+    cls: classifyPhone("pau"),
+    role: "breath",
+    note: last.note,
+    tone: 0,
+    vowelSign: 0,
+    metadata: DEFAULT_VIETNAMESE_METADATA,
+    phoneIndexInNote: 0,
+    phoneCountInNote: 1,
+  });
+
+  return events;
 }
 
 function splitWindow(

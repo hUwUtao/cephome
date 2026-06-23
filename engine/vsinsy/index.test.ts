@@ -643,6 +643,7 @@ tôi t | o | i
     "t",
     "o",
     "i",
+    "pau",
   ]);
   expect(vacuum.end - vacuum.start).toBeLessThanOrEqual(40_000);
 });
@@ -672,6 +673,7 @@ trên ty z | e | N
     "z",
     "e",
     "N",
+    "pau",
   ]);
 });
 

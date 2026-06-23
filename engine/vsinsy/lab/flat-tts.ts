@@ -5,6 +5,7 @@ import type { SinsySerializationResult } from "../index.ts";
 import { transcribeSyllableWithError } from "../../vmora/index.ts";
 import { metadataForLyric, DEFAULT_VIETNAMESE_METADATA } from "../mxl/vietnamese-metadata.ts";
 import { classifyPhone } from "./phoneme.ts";
+import { appendTrailingSilence } from "./timing.ts";
 
 export interface FlatTtsOptions {
   pitchName?: string;
@@ -36,9 +37,10 @@ function getScorePitch(midi: number): ScorePitch {
 }
 
 export function isXml(content: string): boolean {
-  const trimmed = content.trim();
+  const trimmed = content.trim().replace(/^\uFEFF/, "");
   return (
     trimmed.startsWith("<?xml") ||
+    trimmed.startsWith("<!DOCTYPE") ||
     trimmed.startsWith("<score-partwise") ||
     trimmed.startsWith("<score-timewise")
   );
@@ -275,11 +277,12 @@ export function flatTtsToLabel(
     }
   }
 
+  const trailedEvents = appendTrailingSilence(events);
   const monoEmitter = new MonoLabelEmitter();
   const fullEmitter = new SinsyFullLabelEmitter();
   return {
-    mono: monoEmitter.emit(events),
-    full: fullEmitter.emit(events),
+    mono: monoEmitter.emit(trailedEvents),
+    full: fullEmitter.emit(trailedEvents),
   };
 }
 

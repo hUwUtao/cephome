@@ -157,8 +157,9 @@ export async function transcribeWithOverrides(
   const quiet = (globalThis as any).quiet === true;
   const noSvg = (globalThis as any).no_svg === true;
   const noPlayer = (globalThis as any).no_player === true;
+  const forceMusicXml = (globalThis as any).force_musicxml === true;
 
-  if (!isXml(text)) {
+  if (!isXml(text) && !forceMusicXml) {
     if (!quiet) console.error("[cephome] mode: Flat-TTS Mode");
     return flatTtsToLabel(text);
   }
