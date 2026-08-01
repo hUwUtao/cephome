@@ -110,6 +110,24 @@ export interface ModuleProvenance {
   route: string[];
 }
 
+export interface PitchInfluencePolicy {
+  id: string;
+  version: string;
+  label: string;
+  recommendedAmount: number;
+  compression: number;
+  envelope: {
+    attackMs: number;
+    releaseMs: number;
+    plateauMs: number;
+    easing: [number, number, number, number];
+  };
+  contours: Array<{
+    tone: number;
+    points: Array<{ position: number; value: number }>;
+  }>;
+}
+
 export interface PhonePlan {
   protocol: typeof AMADEUS_LANGUAGE_PROTOCOL;
   trackSchema: typeof AMADEUS_TRACK_SCHEMA;
@@ -163,6 +181,42 @@ type InvokeResponse =
 const timing = new VowelAnchoredTimingStrategy({ trailingSilenceSeconds: 0 });
 const transpiler = new VietnameseMoraPlanTranspiler();
 
+const PITCH_INFLUENCE_POLICY: PitchInfluencePolicy = {
+  id: "cephome.vi.lexical-tone",
+  version: "1",
+  label: "Vietnamese lexical tone",
+  recommendedAmount: 0.65,
+  compression: 0.35,
+  envelope: {
+    attackMs: 50,
+    releaseMs: 90,
+    plateauMs: 60,
+    easing: [0, 0, 0.58, 1],
+  },
+  contours: [
+    { tone: 0, points: [{ position: 0, value: 0 }, { position: 1, value: 0 }] },
+    { tone: 1, points: [{ position: 0, value: 0.1 }, { position: 1, value: -0.55 }] },
+    { tone: 2, points: [{ position: 0, value: -0.15 }, { position: 1, value: 0.65 }] },
+    {
+      tone: 3,
+      points: [
+        { position: 0, value: 0.1 },
+        { position: 0.55, value: -0.65 },
+        { position: 1, value: 0.2 },
+      ],
+    },
+    {
+      tone: 4,
+      points: [
+        { position: 0, value: -0.1 },
+        { position: 0.45, value: -0.45 },
+        { position: 1, value: 0.75 },
+      ],
+    },
+    { tone: 5, points: [{ position: 0, value: 0.15 }, { position: 1, value: -0.8 }] },
+  ],
+};
+
 export function describe(): JsonValue {
   return {
     protocol: AMADEUS_LANGUAGE_PROTOCOL,
@@ -170,6 +224,7 @@ export function describe(): JsonValue {
     operations: ["describe", "plan", "finalize"],
     languages: ["vi"],
     engineScores: ["neutrino_sinsy_v1"],
+    pitchInfluencePolicy: PITCH_INFLUENCE_POLICY,
     timingUx: {
       phoneSplits: {
         label: "Show Cephome phone splits",

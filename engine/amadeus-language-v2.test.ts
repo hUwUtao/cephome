@@ -338,3 +338,21 @@ test("unsupported language, malformed JSON, and incompatible requests stay expli
     ),
   ).toMatchObject({ kind: "ok", value: { kind: "neutrino_sinsy_v1" } });
 });
+
+test("describe exposes the stable vendor lexical-tone policy", () => {
+  const response = JSON.parse(
+    invoke(JSON.stringify({ protocol: AMADEUS_LANGUAGE_PROTOCOL, op: "describe" })),
+  );
+  expect(response).toMatchObject({
+    kind: "ok",
+    value: {
+      pitchInfluencePolicy: {
+        id: "cephome.vi.lexical-tone",
+        version: "1",
+        label: "Vietnamese lexical tone",
+        recommendedAmount: 0.65,
+      },
+    },
+  });
+  expect(response.value.pitchInfluencePolicy.contours).toHaveLength(6);
+});
