@@ -221,7 +221,6 @@ export function plan(track: AuthoredTrack): PhonePlan | InvokeResponse {
       id,
       sourceIndex,
       sourceCount,
-      planned.sourceNotesByOwner.get(ownerId) ?? [],
     );
   });
   const invalid = validateSinsyPhones(phones.map((phone) => phone.phone));
@@ -420,7 +419,6 @@ function validateTrack(track: AuthoredTrack): InvokeResponse | null {
 
 interface PlannedScore {
   score: ScoreDocument;
-  sourceNotesByOwner: Map<string, AuthoredNote[]>;
   diagnostics: Diagnostic[];
 }
 
@@ -432,14 +430,12 @@ function scoreFromTrack(track: AuthoredTrack): PlannedScore {
   ].sort((left, right) => left.start100ns! - right.start100ns! || left.id.localeCompare(right.id));
   return {
     score: { sourceName: track.trackId, divisions: track.ppq, notes },
-    sourceNotesByOwner: collapsed.sourceNotesByOwner,
     diagnostics: collapsed.diagnostics,
   };
 }
 
 interface CollapsedSlurNotes {
   notes: AuthoredNote[];
-  sourceNotesByOwner: Map<string, AuthoredNote[]>;
   diagnostics: Diagnostic[];
 }
 
@@ -448,7 +444,6 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
     (left, right) => left.startTick - right.startTick || left.id.localeCompare(right.id),
   );
   const notes: AuthoredNote[] = [];
-  const sourceNotesByOwner = new Map<string, AuthoredNote[]>();
   const diagnostics: Diagnostic[] = [];
 
   for (let index = 0; index < input.length; ) {
@@ -464,7 +459,6 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
       }
       const standalone = normalizedAuthoredNote(note);
       notes.push(standalone);
-      sourceNotesByOwner.set(standalone.id, [note]);
       index += 1;
       continue;
     }
@@ -510,11 +504,10 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
     const owner = normalizedAuthoredNote(note);
     owner.endTick = chain[chain.length - 1]!.endTick;
     notes.push(owner);
-    sourceNotesByOwner.set(owner.id, chain);
     index = cursor;
   }
 
-  return { notes, sourceNotesByOwner, diagnostics };
+  return { notes, diagnostics };
 }
 
 function normalizedAuthoredNote(note: AuthoredNote): AuthoredNote {
@@ -618,9 +611,8 @@ function phoneFromEvent(
   id: string,
   sourceIndex: number,
   sourceCount: number,
-  sourceNotes: AuthoredNote[],
 ): PhonePlanPhone {
-  const sourceNoteIds = sourceNotes
+  const sourceNoteIds = track.notes
     .filter((note) => {
       const start = tickTo100ns(track, note.startTick);
       const end = tickTo100ns(track, note.endTick);
