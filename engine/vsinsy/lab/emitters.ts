@@ -91,106 +91,127 @@ export class SinsyFullLabelEmitter implements LabelEmitter {
   }
 
   private contextFor(events: PhoneEvent[], index: number): string {
-    const event = events[index]!;
-    const note = event.note;
-    const previousNote = distinctNote(events, index, -1);
-    const nextNote = distinctNote(events, index, 1);
-    const expression = expressionForNote(
-      note,
-      previousNote,
-      nextNote,
-      event.tone,
-      event.phoneIndexInNote,
-      event.phoneCountInNote,
-      event.velocity,
-    );
-    const pitch = note.pitch?.name ?? "xx";
-    const beat = `${note.beat.beats}/${note.beat.beatType}`;
-    const tempo = String(Math.round(note.tempo));
-    const phoneCount = clamp(event.phoneCountInNote, 9);
-    const phonePos = clamp(event.phoneIndexInNote + 1, 9);
-    const phoneRemain = clamp(event.phoneCountInNote - event.phoneIndexInNote, 9);
-    const vietnameseContext = encodeVietnameseMetadata(event.metadata);
-
-    const p = fill(16);
-    p[0] = event.cls;
-    p[1] = events[index - 2]?.phoneme ?? "xx";
-    p[2] = events[index - 1]?.phoneme ?? "xx";
-    p[3] = event.phoneme;
-    p[4] = events[index + 1]?.phoneme ?? "xx";
-    p[5] = events[index + 2]?.phoneme ?? "xx";
-    p[11] = String(phonePos);
-    p[12] = String(phoneRemain);
-
-    const a = fill(5);
-    const b = fill(5);
-    const c = fill(5);
-    b[0] = String(phoneCount);
-    b[1] = "1";
-    b[2] = "1";
-    b[3] = "VIE"; // Vietnamese marker
-    b[4] = vietnameseContext;
-
-    c[0] = "1";
-    c[1] = "1";
-    c[2] = "1";
-    c[3] = "VIE";
-    c[4] = vietnameseContext;
-
-    const d = fill(9);
-    fillNoteSummary(d, previousNote);
-
-    const e = fill(60);
-    e[0] = pitch;
-    e[1] = String(note.pitch?.pitchClass ?? 0);
-    e[2] = "0";
-    e[3] = beat;
-    e[4] = tempo;
-    e[5] = "1";
-    e[25] = note.slur === "stop" || note.tie === "stop" || note.tie === "continue" ? "1" : "0";
-    e[26] = note.slur === "start" || note.tie === "start" || note.tie === "continue" ? "1" : "0";
-    e[27] = note.dynamic;
-    e[28] = String(Math.round(expression.vibratoRateHz));
-    e[29] = String(Math.round(expression.vibratoDepthCents));
-    e[30] = String(Math.round(expression.vibratoStartRatio * 100));
-    e[31] = String(Math.round(expression.energy));
-    e[34] = note.hasStaccato ? "1" : "0";
-    e[35] = note.hasStaccato ? "1" : "0";
-    e[40] =
-      expression.pitchDeltaFromPrev < 0 ? String(Math.abs(expression.pitchDeltaFromPrev)) : "0";
-    e[41] = expression.pitchDeltaToNext > 0 ? String(expression.pitchDeltaToNext) : "0";
-    e[56] = formatPitchDiff(expression.pitchDeltaFromPrev);
-    e[57] = formatPitchDiff(expression.pitchDeltaToNext);
-    e[58] = String(Math.round(expression.tonalPitchOffset * 100)); // microtoning in cents?
-    e[59] = note.hasBreath ? "1" : "0";
-
-    const f = fill(9);
-    fillNoteSummary(f, nextNote);
-
-    const g = fill(2);
-    const h = fill(2);
-    const i = fill(2);
-    const j = fill(3);
-    h[0] = "1";
-    h[1] = "1";
-    j[0] = "0";
-    j[1] = "0";
-    j[2] = "1";
-
-    return [
-      serialize(P_SEP, p),
-      serialize(A_SEP, a),
-      serialize(B_SEP, b),
-      serialize(C_SEP, c),
-      serialize(D_SEP, d),
-      serialize(E_SEP, e),
-      serialize(F_SEP, f),
-      serialize(G_SEP, g),
-      serialize(H_SEP, h),
-      serialize(I_SEP, i),
-      serialize(J_SEP, j),
-    ].join("");
+    return serializeSinsyContext(sinsyContextGroups(events, index));
   }
+}
+
+export interface SinsyContextGroups {
+  p: string[];
+  a: string[];
+  b: string[];
+  c: string[];
+  d: string[];
+  e: string[];
+  f: string[];
+  g: string[];
+  h: string[];
+  i: string[];
+  j: string[];
+}
+
+export function sinsyContextGroups(events: PhoneEvent[], index: number): SinsyContextGroups {
+  const event = events[index]!;
+  const note = event.note;
+  const previousNote = distinctNote(events, index, -1);
+  const nextNote = distinctNote(events, index, 1);
+  const expression = expressionForNote(
+    note,
+    previousNote,
+    nextNote,
+    event.tone,
+    event.phoneIndexInNote,
+    event.phoneCountInNote,
+    event.velocity,
+  );
+  const pitch = note.pitch?.name ?? "xx";
+  const beat = `${note.beat.beats}/${note.beat.beatType}`;
+  const tempo = String(Math.round(note.tempo));
+  const phoneCount = clamp(event.phoneCountInNote, 9);
+  const phonePos = clamp(event.phoneIndexInNote + 1, 9);
+  const phoneRemain = clamp(event.phoneCountInNote - event.phoneIndexInNote, 9);
+  const vietnameseContext = encodeVietnameseMetadata(event.metadata);
+
+  const p = fill(16);
+  p[0] = event.cls;
+  p[1] = events[index - 2]?.phoneme ?? "xx";
+  p[2] = events[index - 1]?.phoneme ?? "xx";
+  p[3] = event.phoneme;
+  p[4] = events[index + 1]?.phoneme ?? "xx";
+  p[5] = events[index + 2]?.phoneme ?? "xx";
+  p[11] = String(phonePos);
+  p[12] = String(phoneRemain);
+
+  const a = fill(5);
+  const b = fill(5);
+  const c = fill(5);
+  b[0] = String(phoneCount);
+  b[1] = "1";
+  b[2] = "1";
+  b[3] = "VIE"; // Vietnamese marker
+  b[4] = vietnameseContext;
+
+  c[0] = "1";
+  c[1] = "1";
+  c[2] = "1";
+  c[3] = "VIE";
+  c[4] = vietnameseContext;
+
+  const d = fill(9);
+  fillNoteSummary(d, previousNote);
+
+  const e = fill(60);
+  e[0] = pitch;
+  e[1] = String(note.pitch?.pitchClass ?? 0);
+  e[2] = "0";
+  e[3] = beat;
+  e[4] = tempo;
+  e[5] = "1";
+  e[25] = note.slur === "stop" || note.tie === "stop" || note.tie === "continue" ? "1" : "0";
+  e[26] = note.slur === "start" || note.tie === "start" || note.tie === "continue" ? "1" : "0";
+  e[27] = note.dynamic;
+  e[28] = String(Math.round(expression.vibratoRateHz));
+  e[29] = String(Math.round(expression.vibratoDepthCents));
+  e[30] = String(Math.round(expression.vibratoStartRatio * 100));
+  e[31] = String(Math.round(expression.energy));
+  e[34] = note.hasStaccato ? "1" : "0";
+  e[35] = note.hasStaccato ? "1" : "0";
+  e[40] = expression.pitchDeltaFromPrev < 0 ? String(Math.abs(expression.pitchDeltaFromPrev)) : "0";
+  e[41] = expression.pitchDeltaToNext > 0 ? String(expression.pitchDeltaToNext) : "0";
+  e[56] = formatPitchDiff(expression.pitchDeltaFromPrev);
+  e[57] = formatPitchDiff(expression.pitchDeltaToNext);
+  e[58] = String(Math.round(expression.tonalPitchOffset * 100)); // microtoning in cents?
+  e[59] = note.hasBreath ? "1" : "0";
+
+  const f = fill(9);
+  fillNoteSummary(f, nextNote);
+
+  const g = fill(2);
+  const h = fill(2);
+  const i = fill(2);
+  const j = fill(3);
+  h[0] = "1";
+  h[1] = "1";
+  j[0] = "0";
+  j[1] = "0";
+  j[2] = "1";
+
+  return { p, a, b, c, d, e, f, g, h, i, j };
+}
+
+export function serializeSinsyContext(groups: SinsyContextGroups): string {
+  return [
+    serialize(P_SEP, groups.p),
+    serialize(A_SEP, groups.a),
+    serialize(B_SEP, groups.b),
+    serialize(C_SEP, groups.c),
+    serialize(D_SEP, groups.d),
+    serialize(E_SEP, groups.e),
+    serialize(F_SEP, groups.f),
+    serialize(G_SEP, groups.g),
+    serialize(H_SEP, groups.h),
+    serialize(I_SEP, groups.i),
+    serialize(J_SEP, groups.j),
+  ].join("");
 }
 
 function fill(size: number): string[] {

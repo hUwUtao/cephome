@@ -1,5 +1,6 @@
 import { spawnSync } from "child_process";
 import { copyFileSync, mkdirSync, existsSync } from "fs";
+import { copyTtmAssets } from "./copy-ttm-assets.ts";
 
 console.log("Building frontend...");
 const feResult = spawnSync(
@@ -79,6 +80,8 @@ if (ruleResult.status !== 0) {
   process.exit(ruleResult.status ?? 1);
 }
 
+copyTtmAssets("bin");
+
 console.log("Copying binaries to dist/...");
 if (!existsSync("dist")) {
   mkdirSync("dist");
@@ -87,6 +90,7 @@ if (!existsSync("dist")) {
 copyFileSync("./bin/musicXMLtoLabel.exe", "./dist/musicXMLtoLabel.exe");
 copyFileSync("./bin/cephome-player.exe", "./dist/cephome-player.exe");
 copyFileSync("./bin/rule.js", "./dist/rule.js");
+copyTtmAssets("dist");
 
 console.log("Copying example players to dist/...");
 copyFileSync(

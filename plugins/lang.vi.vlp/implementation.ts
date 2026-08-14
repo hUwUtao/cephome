@@ -1,21 +1,20 @@
-import { sinsyContextGroups, type SinsyContextGroups } from "./vsinsy/lab/emitters.ts";
-import { VietnameseMoraPlanTranspiler } from "./vsinsy/lab/mora-plan.ts";
-import { classifyPhone, validateSinsyPhones } from "./vsinsy/lab/phoneme.ts";
-import { pitchName } from "./vsinsy/lab/pitch-name.ts";
-import { VowelAnchoredTimingStrategy } from "./vsinsy/lab/timing.ts";
-import { canonicalizeSingingLyric } from "./vmora/normalize.ts";
+import { sinsyContextGroups, type SinsyContextGroups } from "../../engine/vsinsy/lab/emitters.ts";
+import { VietnameseMoraPlanTranspiler } from "../../engine/vsinsy/lab/mora-plan.ts";
+import { classifyPhone, validateSinsyPhones } from "../../engine/vsinsy/lab/phoneme.ts";
+import { pitchName } from "../../engine/vsinsy/lab/pitch-name.ts";
+import { VowelAnchoredTimingStrategy } from "../../engine/vsinsy/lab/timing.ts";
+import { canonicalizeSingingLyric } from "../../engine/vmora/normalize.ts";
 import type {
   PhoneEvent,
   PhoneRole,
   ScoreDocument,
   ScoreNote,
   TimedPhonePlan,
-} from "./vsinsy/lab/types.ts";
+} from "../../engine/vsinsy/lab/types.ts";
 
-export const AMADEUS_LANGUAGE_PROTOCOL = "amadeus.language/v2" as const;
-export const AMADEUS_TRACK_SCHEMA = "amadeus.track/v2" as const;
-export const CEPHOME_MODULE_ID = "cephome.vi" as const;
-export const CEPHOME_MODULE_VERSION = "2.0.0" as const;
+export const PLUGIN_VERSION = "2.0.0" as const;
+const TRACK_SCHEMA = "amadeus.track/v2" as const;
+const PLUGIN_ID = "lang.vi.vlp" as const;
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -56,7 +55,7 @@ export interface AuthoredGap {
 }
 
 export interface AuthoredTrack {
-  schema: typeof AMADEUS_TRACK_SCHEMA;
+  schema: typeof TRACK_SCHEMA;
   trackId: string;
   ppq: number;
   tempoMap: TempoPoint[];
@@ -103,34 +102,13 @@ export interface PhonePlanPhone {
 }
 
 export interface ModuleProvenance {
-  protocol: typeof AMADEUS_LANGUAGE_PROTOCOL;
-  moduleId: typeof CEPHOME_MODULE_ID;
-  moduleVersion: typeof CEPHOME_MODULE_VERSION;
+  pluginId: typeof PLUGIN_ID;
+  pluginVersion: typeof PLUGIN_VERSION;
   selectedLanguage: string;
   route: string[];
 }
 
-export interface PitchInfluencePolicy {
-  id: string;
-  version: string;
-  label: string;
-  recommendedAmount: number;
-  compression: number;
-  envelope: {
-    attackMs: number;
-    releaseMs: number;
-    plateauMs: number;
-    easing: [number, number, number, number];
-  };
-  contours: Array<{
-    tone: number;
-    points: Array<{ position: number; value: number }>;
-  }>;
-}
-
 export interface PhonePlan {
-  protocol: typeof AMADEUS_LANGUAGE_PROTOCOL;
-  trackSchema: typeof AMADEUS_TRACK_SCHEMA;
   trackId: string;
   phones: PhonePlanPhone[];
   diagnostics: Diagnostic[];
@@ -154,88 +132,21 @@ export interface EngineRow {
 
 export interface EngineScore {
   kind: "neutrino_sinsy_v1";
-  protocol: typeof AMADEUS_LANGUAGE_PROTOCOL;
   trackId: string;
   rows: EngineRow[];
   diagnostics: Diagnostic[];
   provenance: ModuleProvenance;
 }
 
-type InvokeRequest =
-  | { protocol: typeof AMADEUS_LANGUAGE_PROTOCOL; op: "describe" }
-  | { protocol: typeof AMADEUS_LANGUAGE_PROTOCOL; op: "plan"; track: AuthoredTrack }
-  | {
-      protocol: typeof AMADEUS_LANGUAGE_PROTOCOL;
-      op: "finalize";
-      plan: PhonePlan;
-      timingEdits?: TimingEdit[];
-    };
-
-type InvokeResponse =
-  | { kind: "ok"; value: JsonValue }
-  | {
-      kind: "unsupported" | "malformed" | "incompatible_schema" | "runtime";
-      message: string;
-    };
+type PluginError = {
+  kind: "unsupported" | "malformed" | "incompatible_schema" | "runtime";
+  message: string;
+};
 
 const timing = new VowelAnchoredTimingStrategy({ trailingSilenceSeconds: 0 });
 const transpiler = new VietnameseMoraPlanTranspiler();
 
-const PITCH_INFLUENCE_POLICY: PitchInfluencePolicy = {
-  id: "cephome.vi.lexical-tone",
-  version: "1",
-  label: "Vietnamese lexical tone",
-  recommendedAmount: 0.65,
-  compression: 0.35,
-  envelope: {
-    attackMs: 50,
-    releaseMs: 90,
-    plateauMs: 60,
-    easing: [0, 0, 0.58, 1],
-  },
-  contours: [
-    { tone: 0, points: [{ position: 0, value: 0 }, { position: 1, value: 0 }] },
-    { tone: 1, points: [{ position: 0, value: 0.1 }, { position: 1, value: -0.55 }] },
-    { tone: 2, points: [{ position: 0, value: -0.15 }, { position: 1, value: 0.65 }] },
-    {
-      tone: 3,
-      points: [
-        { position: 0, value: 0.1 },
-        { position: 0.55, value: -0.65 },
-        { position: 1, value: 0.2 },
-      ],
-    },
-    {
-      tone: 4,
-      points: [
-        { position: 0, value: -0.1 },
-        { position: 0.45, value: -0.45 },
-        { position: 1, value: 0.75 },
-      ],
-    },
-    { tone: 5, points: [{ position: 0, value: 0.15 }, { position: 1, value: -0.8 }] },
-  ],
-};
-
-export function describe(): JsonValue {
-  return {
-    protocol: AMADEUS_LANGUAGE_PROTOCOL,
-    module: { id: CEPHOME_MODULE_ID, version: CEPHOME_MODULE_VERSION },
-    operations: ["describe", "plan", "finalize"],
-    languages: ["vi"],
-    engineScores: ["neutrino_sinsy_v1"],
-    pitchInfluencePolicy: PITCH_INFLUENCE_POLICY,
-    timingUx: {
-      phoneSplits: {
-        label: "Show Cephome phone splits",
-        tooltip: "Show every finalized segment when Cephome expands a phone.",
-        default: true,
-      },
-    },
-  };
-}
-
-export function plan(track: AuthoredTrack): PhonePlan | InvokeResponse {
+export function plan(track: AuthoredTrack): PhonePlan | PluginError {
   const problem = validateTrack(track);
   if (problem) return problem;
   const selectedLanguage = track.languageRoute[0] ?? "vi";
@@ -270,21 +181,13 @@ export function plan(track: AuthoredTrack): PhonePlan | InvokeResponse {
       sourceKeyCounts.get(sourceKey) === 1
         ? `${ownerPrefix}:${ownerId}:phone:${sourceIndex}`
         : `${ownerPrefix}:${ownerId}:event:${eventIndex}`;
-    return phoneFromEvent(
-      track,
-      event,
-      id,
-      sourceIndex,
-      sourceCount,
-    );
+    return phoneFromEvent(track, event, id, sourceIndex, sourceCount);
   });
   const invalid = validateSinsyPhones(phones.map((phone) => phone.phone));
   if (invalid.length > 0) {
     return { kind: "malformed", message: `unsupported phone palette: ${invalid.join(", ")}` };
   }
   return {
-    protocol: AMADEUS_LANGUAGE_PROTOCOL,
-    trackSchema: AMADEUS_TRACK_SCHEMA,
     trackId: track.trackId,
     phones,
     diagnostics: planned.diagnostics,
@@ -295,10 +198,7 @@ export function plan(track: AuthoredTrack): PhonePlan | InvokeResponse {
 export function finalize(
   planValue: PhonePlan,
   timingEdits: TimingEdit[] = [],
-): EngineScore | InvokeResponse {
-  if (planValue.protocol !== AMADEUS_LANGUAGE_PROTOCOL) {
-    return { kind: "incompatible_schema", message: `expected ${AMADEUS_LANGUAGE_PROTOCOL}` };
-  }
+): EngineScore | PluginError {
   const diagnostics = [...planValue.diagnostics];
   const ownerCounts = new Map<string, number>();
   for (const phone of planValue.phones) {
@@ -338,7 +238,6 @@ export function finalize(
   });
   return {
     kind: "neutrino_sinsy_v1",
-    protocol: AMADEUS_LANGUAGE_PROTOCOL,
     trackId: planValue.trackId,
     rows,
     diagnostics,
@@ -346,44 +245,9 @@ export function finalize(
   };
 }
 
-export function invoke(requestJson: string): string {
-  let request: InvokeRequest;
-  try {
-    request = JSON.parse(requestJson) as InvokeRequest;
-  } catch (error) {
-    return JSON.stringify({ kind: "malformed", message: errorMessage(error) });
-  }
-  try {
-    if (request.protocol !== AMADEUS_LANGUAGE_PROTOCOL) {
-      return JSON.stringify({
-        kind: "incompatible_schema",
-        message: `expected ${AMADEUS_LANGUAGE_PROTOCOL}`,
-      });
-    }
-    let value: JsonValue | InvokeResponse;
-    switch (request.op) {
-      case "describe":
-        value = describe();
-        break;
-      case "plan":
-        value = plan(request.track) as JsonValue | InvokeResponse;
-        break;
-      case "finalize":
-        value = finalize(request.plan, request.timingEdits) as JsonValue | InvokeResponse;
-        break;
-      default:
-        return JSON.stringify({ kind: "malformed", message: "unknown operation" });
-    }
-    if (isErrorResponse(value)) return JSON.stringify(value);
-    return JSON.stringify({ kind: "ok", value });
-  } catch (error) {
-    return JSON.stringify({ kind: "runtime", message: errorMessage(error) });
-  }
-}
-
-function validateTrack(track: AuthoredTrack): InvokeResponse | null {
-  if (!track || track.schema !== AMADEUS_TRACK_SCHEMA) {
-    return { kind: "incompatible_schema", message: `expected ${AMADEUS_TRACK_SCHEMA}` };
+function validateTrack(track: AuthoredTrack): PluginError | null {
+  if (!track || track.schema !== TRACK_SCHEMA) {
+    return { kind: "incompatible_schema", message: `expected ${TRACK_SCHEMA}` };
   }
   if (!track.trackId?.trim()) return { kind: "malformed", message: "trackId is empty" };
   if (!Number.isSafeInteger(track.ppq) || track.ppq <= 0) {
@@ -758,9 +622,8 @@ function rowFromEvent(
 
 function provenance(selectedLanguage: string, route: string[]): ModuleProvenance {
   return {
-    protocol: AMADEUS_LANGUAGE_PROTOCOL,
-    moduleId: CEPHOME_MODULE_ID,
-    moduleVersion: CEPHOME_MODULE_VERSION,
+    pluginId: PLUGIN_ID,
+    pluginVersion: PLUGIN_VERSION,
     selectedLanguage,
     route: [...route],
   };
@@ -814,22 +677,3 @@ function roleForOverride(phone: string, index: number, phones: string[]): PhoneR
   if (index < anchor) return "pre";
   return ["a", "i", "u", "e", "o"].includes(phone) ? "anchor" : "tail";
 }
-
-function isErrorResponse(value: JsonValue | InvokeResponse): value is InvokeResponse {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "kind" in value &&
-    ["unsupported", "malformed", "incompatible_schema", "runtime"].includes(String(value.kind))
-  );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-declare global {
-  var __amadeusLanguageInvoke: (requestJson: string) => string;
-}
-
-globalThis.__amadeusLanguageInvoke = invoke;

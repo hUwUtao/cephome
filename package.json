@@ -9,7 +9,9 @@
     "build:musicXMLtoLabel:win": "bun build --compile --target=bun-windows-x64 ./engine/vsinsy/bin/musicXMLtoLabel.ts --outfile ./bin/musicXMLtoLabel.exe",
     "build:bin:win": "bun build --compile --target=bun-windows-x64 ./engine/vsinsy/bin/stub.ts --outfile ./bin/musicXMLtoLabel.exe",
     "build:stub:win": "bun build --compile --target=bun-windows-x64 ./engine/vsinsy/bin/stub.ts --outfile ./bin/musicXMLtoLabel.exe",
-    "build:rule": "bun build ./engine/vsinsy/bin/rule-api.ts --minify --bundle --format esm --target bun --sourcemap=inline --outfile ./bin/rule.js",
+    "build:rule": "bun build ./engine/vsinsy/bin/rule-api.ts --minify --bundle --format esm --target bun --sourcemap=inline --outfile ./bin/rule.js && bun run scripts/copy-ttm-assets.ts ./bin",
+    "build:amadeus-plugin": "bun run ./scripts/build-amadeus-plugin.ts",
+    "release:amadeus-plugin": "bun run build:amadeus-plugin",
     "build": "bun run scripts/build.ts",
     "start": "NODE_ENV=production bun src/index.ts",
     "fmt": "oxfmt",
@@ -17,9 +19,12 @@
     "regen:example": "bun run ./engine/vsinsy/bin/musicXMLtoLabel.ts ./example/lathuyenuocmo.musicxml ./example/lathuyenuocmo.full.lab ./example/lathuyenuocmo.mono.lab && bun run ./engine/vsinsy/bin/musicXMLtoLabel.ts ./example/emlamamnoncuadang.musicxml ./example/emlamamnoncuadang.full.lab ./example/emlamamnoncuadang.mono.lab"
   },
   "dependencies": {
+    "@amsvs/api": "^1.0.0",
     "@xmldom/xmldom": "^0.9.10",
+    "onnxruntime-web": "^1.27.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "read-vietnamese-number": "2.3.1",
     "svgo": "^4.0.1"
   },
   "devDependencies": {

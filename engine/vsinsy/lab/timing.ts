@@ -63,6 +63,12 @@ export interface VowelAnchoredTimingOptions {
   lingerRatio: number;
   maxLingerSeconds: number;
   tailSteal: number;
+  minBoundaryTailSeconds: number;
+  vowelEmphasis: number;
+  noteDecimationMinSeconds: number;
+  noteDecimationSegments: number;
+  trailingSilenceSeconds: number;
+  trailingSilencePhone: "pau" | "sil";
 }
 
 export class VowelAnchoredTimingStrategy implements TimingStrategy {
@@ -82,18 +88,28 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
       lingerRatio: options.lingerRatio ?? 0.18,
       maxLingerSeconds: options.maxLingerSeconds ?? 0.08,
       tailSteal: options.tailSteal ?? 0.6,
+      minBoundaryTailSeconds: options.minBoundaryTailSeconds ?? 0.02,
+      vowelEmphasis: options.vowelEmphasis ?? 1,
+      noteDecimationMinSeconds: options.noteDecimationMinSeconds ?? 0.35,
+      noteDecimationSegments: options.noteDecimationSegments ?? 2,
+      trailingSilenceSeconds: options.trailingSilenceSeconds ?? 1,
+      trailingSilencePhone: options.trailingSilencePhone ?? "pau",
     };
   }
 
   toPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {
+    return this.finalizePhoneEvents(this.planPhoneEvents(score, lyricTranspiler));
+  }
+
+  planPhoneEvents(score: ScoreDocument, lyricTranspiler: LyricTranspiler): PhoneEvent[] {
     const events: PhoneEvent[] = [];
     const notes = score.notes
       .filter((note) => !note.isChord)
       .sort((a, b) => a.startDiv - b.startDiv || a.id.localeCompare(b.id));
 
     for (const note of notes) {
-      const start = ticksForDivs(note.startDiv, note);
-      const end = ticksForDivs(note.endDiv, note);
+      const start = note.start100ns ?? ticksForDivs(note.startDiv, note);
+      const end = note.end100ns ?? ticksForDivs(note.endDiv, note);
 
       const planResult = planForNote(note, lyricTranspiler);
       const transpiled = note.lyric ? lyricTranspiler.transpile(note.lyric) : null;
@@ -115,18 +131,23 @@ export class VowelAnchoredTimingStrategy implements TimingStrategy {
           ghost: window.ghost,
           vacuum: window.vacuum,
           velocity: window.velocity,
+          weight: window.weight,
           phoneIndexInNote: index,
           phoneCountInNote: windows.length,
         });
       });
     }
 
+    return renumberPhoneIndexes(
+      collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
+    );
+  }
+
+  finalizePhoneEvents(events: PhoneEvent[]): PhoneEvent[] {
     return appendTrailingSilence(
-      applyVowelDecimationSplit(
-        applyNoteDecimationSplit(
-          collapseCrowdedVacuumEvents(applyBoundaryPrefire(events, this.options)),
-        ),
-      ),
+      applyVowelDecimationSplit(applyNoteDecimationSplit(events, this.options)),
+      this.options.trailingSilenceSeconds,
+      this.options.trailingSilencePhone,
     );
   }
 }
@@ -139,7 +160,7 @@ function ticksForDivs(divs: number, note: { divisions: number; tempo: number }):
 }
 
 function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): string[] {
-  if (note.isRest) return ["pau"];
+  if (note.isRest) return [restPhone(note)];
   if (note.carriedPhones)
     return note.hasBreath ? [...note.carriedPhones, "br"] : note.carriedPhones;
   const phones = note.lyric ? lyricTranspiler.transpile(note.lyric).phones : [];
@@ -147,7 +168,7 @@ function phonesForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): strin
 }
 
 function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPhonePlan[] {
-  if (note.isRest) return [{ phone: "pau", role: "breath", weight: 1 }];
+  if (note.isRest) return [{ phone: restPhone(note), role: "breath", weight: 1 }];
   if (note.carriedPlan) {
     let plan = note.carriedPlan;
     if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
@@ -172,6 +193,12 @@ function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPh
 
   if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
   return plan;
+}
+
+function restPhone(note: ScoreNote): "pau" | "sil" | "br" {
+  if (note.expression === "talk-silence") return "sil";
+  if (note.expression === "talk-breath") return "br";
+  return "pau";
 }
 
 function isRoleAware(
@@ -239,6 +266,10 @@ function assignPhoneWindows(
     }
   }
 
+  const vowelEmphasis = Math.max(1, options.vowelEmphasis);
+  preDur /= vowelEmphasis;
+  tailDur /= vowelEmphasis;
+
   const nonAnchorLimit = total * options.maxNonAnchorRatio;
   if (preDur + tailDur > nonAnchorLimit) {
     const scale = nonAnchorLimit / (preDur + tailDur);
@@ -267,6 +298,13 @@ function applyBoundaryPrefire(
     const currentNote = current[0]!.note;
 
     if (currentNote.hasBreath) continue;
+    if (
+      index === 1 &&
+      previousNote.isRest &&
+      previousNote.startDiv === 0 &&
+      previousNote.expression?.startsWith("talk-")
+    )
+      continue;
 
     const previousLast = previous[previous.length - 1]!;
 
@@ -309,9 +347,17 @@ function applyBoundaryPrefire(
 
     if (neededPrefire <= 0) continue;
 
-    const safePrefire = Math.floor(Math.min(neededPrefire, lingerReserve * options.tailSteal));
+    const previousLastDuration = previousLast.end - previousLast.start;
+    const retainedTail = options.minBoundaryTailSeconds * 10_000_000;
+    const availableTail = Math.max(0, previousLastDuration - retainedTail);
+    const safePrefire = Math.floor(
+      Math.min(neededPrefire, lingerReserve * options.tailSteal, availableTail),
+    );
 
-    if (safePrefire <= 0) continue;
+    if (safePrefire <= 0) {
+      if (previousLast.end < boundary) previousLast.end = Math.floor(boundary);
+      continue;
+    }
 
     const newPreviousEnd = boundary - safePrefire;
     closeGroupAt(previous, newPreviousEnd);
@@ -531,11 +577,17 @@ function applyVowelDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
  * first sub-segment is shortest (quick tonal departure) and later segments
  * get progressively more settling time.
  */
-const NOTE_DECIMATION_MIN_TICKS = 3_500_000; // 350 ms minimum for subdivision
-
-export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
+export function applyNoteDecimationSplit(
+  events: PhoneEvent[],
+  options: Pick<
+    VowelAnchoredTimingOptions,
+    "noteDecimationMinSeconds" | "noteDecimationSegments"
+  > = { noteDecimationMinSeconds: 0.35, noteDecimationSegments: 2 },
+): PhoneEvent[] {
   const groups = groupByNote(events);
   const out: PhoneEvent[] = [];
+  const minimumTicks = Math.max(1, options.noteDecimationMinSeconds * 10_000_000);
+  const requestedSegments = Math.max(2, Math.min(6, Math.round(options.noteDecimationSegments)));
 
   for (const group of groups) {
     // Find the first eligible non-ghost vowel anchor
@@ -570,7 +622,7 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
     const vowelPhase = group.slice(phaseStart, phaseEnd + 1);
     const duration = vowelPhase.reduce((sum, e) => sum + (e.end - e.start), 0);
 
-    if (duration < NOTE_DECIMATION_MIN_TICKS) {
+    if (duration < minimumTicks) {
       out.push(...group);
       continue;
     }
@@ -586,9 +638,8 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
 
     for (const ve of vowelPhase) {
       const phoneDur = ve.end - ve.start;
-      // Double split per mora: split phone into 2 progressive sub-segments
-      // Only skip if the phone is trivially short (< 50ms — ghost scraps)
-      const segs = phoneDur >= 500_000 ? 2 : 1;
+      // Keep at least ~18 ms per guide segment so p.bin receives meaningful windows.
+      const segs = Math.min(requestedSegments, Math.floor(phoneDur / 180_000));
       if (segs <= 1) {
         out.push({
           ...ve,
@@ -625,30 +676,34 @@ export function applyNoteDecimationSplit(events: PhoneEvent[]): PhoneEvent[] {
   return renumberPhoneIndexes(out);
 }
 
-/** 1 second of trailing silence for gradual decay (100ns ticks) */
-const TRAILING_SILENCE_TICKS = 10_000_000;
-
 /** Maximum fade into trailing silence (300ms) */
 const TRAILING_FADE_MAX_TICKS = 3_000_000;
 
 /**
- * Append ~1 second of silence after the last non-silence event
- * so synthesized audio decays gradually instead of cutting off.
+ * Append configurable silence after the last non-silence event so synthesized
+ * audio decays gradually instead of cutting off.
  */
-export function appendTrailingSilence(events: PhoneEvent[]): PhoneEvent[] {
+export function appendTrailingSilence(
+  events: PhoneEvent[],
+  seconds: number = 1,
+  phoneme: "pau" | "sil" = "pau",
+): PhoneEvent[] {
   if (events.length === 0) return events;
+  if (seconds <= 0) return events;
   const last = events[events.length - 1]!;
   const isSilence = last.phoneme === "pau" || last.phoneme === "br" || last.phoneme === "sil";
   if (isSilence) return events;
 
+  const trailingTicks = Math.max(1, Math.round(seconds * 10_000_000));
+
   const fadeTicks = Math.min(
     TRAILING_FADE_MAX_TICKS,
     (last.end - last.start) * 0.5,
-    TRAILING_SILENCE_TICKS * 0.3,
+    trailingTicks * 0.3,
   );
 
   const silenceStart = last.end;
-  const silenceEnd = silenceStart + TRAILING_SILENCE_TICKS;
+  const silenceEnd = silenceStart + trailingTicks;
 
   if (fadeTicks > 0) {
     last.end = Math.floor(silenceStart + fadeTicks);
@@ -657,8 +712,8 @@ export function appendTrailingSilence(events: PhoneEvent[]): PhoneEvent[] {
   events.push({
     start: Math.floor(last.end),
     end: Math.floor(silenceEnd),
-    phoneme: "pau",
-    cls: classifyPhone("pau"),
+    phoneme,
+    cls: classifyPhone(phoneme),
     role: "breath",
     note: last.note,
     tone: 0,

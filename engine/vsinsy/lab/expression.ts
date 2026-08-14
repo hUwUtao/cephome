@@ -84,7 +84,7 @@ function calculateTonalOffset(
   index: number,
   count: number,
   dynamic: string = "mf",
-  _expression: string | null = null,
+  expression: string | null = null,
 ): number {
   if (count <= 1) return 0;
   const ratio = index / (count - 1);
@@ -112,7 +112,8 @@ function calculateTonalOffset(
 
   // Feature 3: Dynamic volume & pitch assist (pppp-ffff)
   const scale = dynamicScaleFactor(dynamic);
-  offset *= scale;
+  const toneScale = expression === "talk" ? 1.65 : 1;
+  offset *= scale * toneScale;
 
   // Head/Tail assists (Attack overshoot / release decay)
   const isLoud = ["f", "ff", "fff", "ffff"].includes(dynamic);

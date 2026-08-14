@@ -1,4 +1,6 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+// node:fs is loaded only when installPhraseOverrideHooks runs (NEUTRINO CLI).
+// read/writeGlobalPhraseOverride use globalThis hooks only — pure plugin load
+// must not require a static fs link.
 
 type PhraseOverrideReader = () => Promise<string> | string;
 type PhraseOverrideWriter = (content: string) => Promise<string> | string;
@@ -55,8 +57,10 @@ export function installPhraseOverrideHooks(
   Reflect.set(globalThis, "f0_path", f0Path);
   Reflect.set(globalThis, "force_musicxml", forceMusicXml);
 
+  // Lazy fs so rule.js pure load (no installPhraseOverrideHooks) needs no Node.
   Reflect.set(globalThis, "read_phrase_override", async () => {
     try {
+      const { existsSync, readFileSync, statSync } = await import("node:fs");
       if (!existsSync(path) || !statSync(path).isFile()) return "";
       return readFileSync(path, "utf8");
     } catch {
@@ -65,6 +69,7 @@ export function installPhraseOverrideHooks(
   });
   Reflect.set(globalThis, "write_phrase_override", async (content: string) => {
     try {
+      const { existsSync, writeFileSync } = await import("node:fs");
       if (!existsSync(path)) writeFileSync(path, content, "utf8");
     } catch {
       // Best-effort sidecar only.

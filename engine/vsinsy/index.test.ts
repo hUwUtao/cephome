@@ -521,10 +521,11 @@ test("vowel-anchored timing prefires leading head before the vowel boundary", ()
   const secondVowel = events.find((event) => event.note.lyric === "dạ" && event.phoneme === "a");
   const previousTail = events.find((event) => event.note.lyric === "kiên" && event.phoneme === "N");
 
-  expect(secondOnset?.start).toBe(5600000);
-  expect(secondOnset?.end).toBe(6000000);
-  expect(secondVowel?.start).toBe(6000000);
-  expect(previousTail?.end).toBe(5600000);
+  expect(secondOnset?.start).toBe(5850000);
+  expect(secondOnset?.end).toBe(6250000);
+  expect(secondVowel?.start).toBe(6250000);
+  expect(previousTail?.end).toBe(5850000);
+  expect((previousTail?.end ?? 0) - (previousTail?.start ?? 0)).toBe(200000);
 });
 
 test("timing does not turn missing lyric pitched notes into pau", () => {

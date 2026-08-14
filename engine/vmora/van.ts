@@ -22,6 +22,7 @@ export function nucleusToPhonemes(nucleus: string): string[] {
     ưi: ["u", "i"],
     ei: ["e", "i"],
     âu: ["o", "u"],
+    uâ: ["u", "a"],
     uyê: ["u", "y", "e"],
     // Double vowels (for transliterations/loanwords)
     aa: ["a"],

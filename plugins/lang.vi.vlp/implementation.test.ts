@@ -1,14 +1,11 @@
 import { expect, test } from "bun:test";
 import {
-  AMADEUS_LANGUAGE_PROTOCOL,
-  AMADEUS_TRACK_SCHEMA,
   finalize,
-  invoke,
   plan,
   type AuthoredTrack,
   type EngineScore,
   type PhonePlan,
-} from "./amadeus-language-v2.ts";
+} from "./implementation.ts";
 
 const CONTEXT_SEPARATORS = {
   p: ["", "@", "^", "-", "+", "=", "_", "%", "^", "_", "~", "-", "!", "[", "$", "]"],
@@ -100,7 +97,7 @@ function serializeEngineScore(score: EngineScore): string[] {
 
 function track(): AuthoredTrack {
   return {
-    schema: AMADEUS_TRACK_SCHEMA,
+    schema: "amadeus.track/v2",
     trackId: "voice-1",
     ppq: 480,
     tempoMap: [
@@ -134,7 +131,7 @@ function track(): AuthoredTrack {
 
 function threeNoteSlur(): AuthoredTrack {
   return {
-    schema: AMADEUS_TRACK_SCHEMA,
+    schema: "amadeus.track/v2",
     trackId: "slur-voice",
     ppq: 480,
     tempoMap: [{ tick: 0, bpm: 120 }],
@@ -150,7 +147,7 @@ function threeNoteSlur(): AuthoredTrack {
   };
 }
 
-test("amadeus.language/v2 plans stable phone and gap IDs deterministically", () => {
+test("plugin language hook plans stable phone and gap IDs deterministically", () => {
   const first = plan(track()) as PhonePlan;
   const second = plan(track()) as PhonePlan;
   expect(first).toEqual(second);
@@ -189,6 +186,25 @@ test("three-note slur plans one syllable across the complete authored chain", ()
   expect(result.rows).toHaveLength(phonePlan.phones.length);
   expect(result.rows.every((row) => row.segmentIndex === 0)).toBe(true);
   expect(result.rows.every((row) => row.contexts.e[58] === "0")).toBe(true);
+});
+
+test("long slur coda coverage may exclude the primary lyric note", () => {
+  const value = threeNoteSlur();
+  value.extent.endTick = 3840;
+  value.notes = Array.from({ length: 8 }, (_, index) => ({
+    id: `n${index + 1}`,
+    startTick: index * 480,
+    endTick: (index + 1) * 480,
+    pitch: 60 + index,
+    lyric: index === 0 ? "phương" : undefined,
+    slurs: index === 0 ? ["start"] : index === 7 ? ["stop"] : undefined,
+  }));
+
+  const phonePlan = plan(value) as PhonePlan;
+  const coda = phonePlan.phones.filter((phone) => phone.role === "tail");
+  expect(coda.length).toBeGreaterThan(0);
+  expect(coda.every((phone) => phone.ownerId === "n1")).toBe(true);
+  expect(coda.every((phone) => phone.sourceNoteIds?.join(",") === "n8")).toBe(true);
 });
 
 test("malformed slurs diagnose boundaries without dropping voiced lyrics", () => {
@@ -307,52 +323,16 @@ test("phone overrides retain unsplit source mapping", () => {
   }
 });
 
-test("unsupported language, malformed JSON, and incompatible requests stay explicit", () => {
+test("plugin language hook keeps unsupported and malformed tracks explicit", () => {
   const unsupported = track();
   unsupported.languageRoute = ["ja", "vi"];
   expect(plan(unsupported)).toEqual({
     kind: "unsupported",
     message: "Cephome does not support ja",
   });
-  expect(JSON.parse(invoke("{"))).toMatchObject({ kind: "malformed" });
   const malformed = track();
   malformed.notes[0]!.endTick = malformed.notes[0]!.startTick;
   expect(plan(malformed)).toMatchObject({ kind: "malformed" });
-  expect(
-    JSON.parse(invoke(JSON.stringify({ protocol: "amadeus.language/v1", op: "describe" }))),
-  ).toMatchObject({ kind: "incompatible_schema" });
-  expect(
-    JSON.parse(invoke(JSON.stringify({ protocol: AMADEUS_LANGUAGE_PROTOCOL, op: "describe" }))),
-  ).toMatchObject({ kind: "ok" });
   const phonePlan = plan(track()) as PhonePlan;
-  expect(
-    JSON.parse(
-      invoke(
-        JSON.stringify({
-          protocol: AMADEUS_LANGUAGE_PROTOCOL,
-          op: "finalize",
-          plan: phonePlan,
-          timingEdits: [],
-        }),
-      ),
-    ),
-  ).toMatchObject({ kind: "ok", value: { kind: "neutrino_sinsy_v1" } });
-});
-
-test("describe exposes the stable vendor lexical-tone policy", () => {
-  const response = JSON.parse(
-    invoke(JSON.stringify({ protocol: AMADEUS_LANGUAGE_PROTOCOL, op: "describe" })),
-  );
-  expect(response).toMatchObject({
-    kind: "ok",
-    value: {
-      pitchInfluencePolicy: {
-        id: "cephome.vi.lexical-tone",
-        version: "1",
-        label: "Vietnamese lexical tone",
-        recommendedAmount: 0.65,
-      },
-    },
-  });
-  expect(response.value.pitchInfluencePolicy.contours).toHaveLength(6);
+  expect(finalize(phonePlan)).toMatchObject({ kind: "neutrino_sinsy_v1" });
 });

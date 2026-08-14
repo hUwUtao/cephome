@@ -189,3 +189,8 @@ test("transcribe: đâu (âu diphthong)", () => {
 test("transcribe: xuôi (medial u)", () => {
   expect(transcribeSyllable("xuôi")).toBe("s,u,o,i");
 });
+
+test("transcribe: thuận (uâ nucleus)", () => {
+  expect(transcribeSyllable("thuận")).toBe("ty,u,a,n,cl");
+  expect(transcribeSyllable("thuận", "voicevox")).toBe("ty,u,a,N,cl");
+});

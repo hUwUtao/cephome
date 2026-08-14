@@ -48,11 +48,11 @@ export interface ScoreNote {
   isGrace: boolean;
   isCue: boolean;
   isPrintable: boolean;
-	lyric: string | null;
-	codaSuppress?: boolean;
-	carriedPhones?: string[] | null;
-	carriedPlan?: TimedPhonePlan[] | null;
-	carriedTone?: number | null;
+  lyric: string | null;
+  codaSuppress?: boolean;
+  carriedPhones?: string[] | null;
+  carriedPlan?: TimedPhonePlan[] | null;
+  carriedTone?: number | null;
   syllabic: "single" | "begin" | "middle" | "end" | null;
   pitch: ScorePitch | null;
   tie: "start" | "stop" | "continue" | null;
@@ -62,6 +62,9 @@ export interface ScoreNote {
   hasAccent: boolean;
   hasStaccato: boolean;
   expression?: string | null;
+  /** Exact authored geometry for hosts that already integrated tempo maps. */
+  start100ns?: number;
+  end100ns?: number;
 }
 
 export interface ScoreDocument {
@@ -107,10 +110,13 @@ export interface PhoneEvent {
   ghost?: boolean;
   vacuum?: boolean;
   velocity?: number;
+  weight?: number;
   phoneIndexInNote: number;
   phoneCountInNote: number;
   /** Ease-in-out ratio (0..1) for the middle segment of a 3-way vowel decimation split. */
   decimationEase?: number;
+  /** Stable pre-finalization identity supplied by structured hosts. */
+  sourcePhoneId?: string;
 }
 
 export interface ExpressionGauge {

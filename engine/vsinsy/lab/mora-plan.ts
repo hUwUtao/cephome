@@ -6,6 +6,7 @@ import { validateSinsyPhones } from "./phoneme.ts";
 import { DEFAULT_VIETNAMESE_METADATA, metadataForLyric } from "../mxl/vietnamese-metadata.ts";
 import { dictionaryPlanForLyric } from "../dict/dictionary.ts";
 import type { VietnameseDictionaryEntries } from "../dict/dictionary.ts";
+import { canonicalizeSingingLyric } from "../../vmora/normalize.ts";
 
 type SinsyVietnameseMode = "transparent" | "voicevox" | "singing";
 
@@ -20,13 +21,14 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
   }
 
   plan(lyric: string): SyllablePhonePlan {
+    const normalizedLyric = canonicalizeSingingLyric(lyric);
     try {
-      const parsed = segmentSyllable(lyric);
-      const metadata = metadataForLyric(lyric);
-      const dictionaryPlan = dictionaryPlanForLyric(lyric, this.dictionaryEntries);
+      const parsed = segmentSyllable(normalizedLyric);
+      const metadata = metadataForLyric(normalizedLyric);
+      const dictionaryPlan = dictionaryPlanForLyric(normalizedLyric, this.dictionaryEntries);
       if (dictionaryPlan) {
         return filterPlan(
-          lyric,
+          normalizedLyric,
           parsed.tone,
           metadata.vowelSign,
           metadata,
@@ -65,7 +67,7 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
           plan.push({
             phone,
             role: "anchor",
-            weight: 0.05,
+            weight: 0.08,
             ghost: true,
           });
         }
@@ -75,7 +77,7 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
         plan.push({ phone, role: "tail", weight: tailWeight(phone) });
       }
 
-      return filterPlan(lyric, parsed.tone, metadata.vowelSign, metadata, plan);
+      return filterPlan(normalizedLyric, parsed.tone, metadata.vowelSign, metadata, plan);
     } catch (error) {
       const reason = error instanceof Error ? error.message.toLowerCase() : "unknown error";
       return {

@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs";
 import { DomMusicXmlParser } from "./mxl/musicxml.ts";
 import { MonoLabelEmitter, SinsyFullLabelEmitter } from "./lab/emitters.ts";
 import { VowelAnchoredTimingStrategy } from "./lab/timing.ts";
@@ -12,7 +11,7 @@ import {
 import { generateTimelineSvg } from "./generator/timeline-svg.ts";
 import { generateInteractivePlayerHtml } from "./generator/player-template.ts";
 import type { F0Data } from "../vneuvis/types.ts";
-import { flatTtsToLabel, isXml } from "./lab/flat-tts.ts";
+import { isXml, talkaloidToLabelAuto } from "./lab/talkaloid.ts";
 import { metadataForLyric } from "./mxl/vietnamese-metadata.ts";
 import {
   readGlobalPhraseOverride,
@@ -28,6 +27,10 @@ import type {
   ScoreNormalizer,
   TimingStrategy,
 } from "./lab/types.ts";
+
+// node:fs is only loaded via dynamic import inside the SVG/player side-effect
+// branch (when !no_svg). The pure label path must not force an fs module link
+// so hosts without Node APIs (or Amadeus pure-plugin mode) can load this graph.
 
 export interface SinsyPipelineOptions {
   parser?: MusicXmlParser;
@@ -160,8 +163,12 @@ export async function transcribeWithOverrides(
   const forceMusicXml = (globalThis as any).force_musicxml === true;
 
   if (!isXml(text) && !forceMusicXml) {
-    if (!quiet) console.error("[cephome] mode: Flat-TTS Mode");
-    return flatTtsToLabel(text);
+    if (!quiet) console.error("[cephome] mode: Talk Mode");
+    const talkSpeed = typeof globalThis.talk_speed === "number" ? globalThis.talk_speed : undefined;
+    return talkaloidToLabelAuto(text, { talkSpeed }, (error) => {
+      if (!quiet)
+        console.error(`[cephome] TTM unavailable, using heuristic timing: ${error.message}`);
+    });
   }
 
   if (!quiet) console.error("[cephome] mode: Music Mode");
@@ -181,13 +188,14 @@ export async function transcribeWithOverrides(
   }
 
   if (sourceName && !noSvg) {
+    // Dynamic only — keeps pure transcribe (quiet + no_svg) free of node:fs.
+    const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
     const svgPath = `${sourceName}.timeline.svg`;
     let actualF0: F0Data | undefined;
     try {
       const baseWithoutExt = sourceName.substring(0, sourceName.lastIndexOf("."));
       const f0PathOverride = (globalThis as any).f0_path;
       const f0Path = f0PathOverride || baseWithoutExt + ".f0";
-      const { existsSync, readFileSync } = await import("node:fs");
       if (existsSync(f0Path)) {
         const { readF0 } = await import("../vneuvis/index.ts");
         const f0Buf = readFileSync(f0Path);
@@ -207,7 +215,6 @@ export async function transcribeWithOverrides(
     if (!noPlayer) {
       const playerPath = `${sourceName}.player.html`;
       try {
-        const { existsSync } = await import("node:fs");
         const baseWithoutExt = sourceName.substring(0, sourceName.lastIndexOf("."));
         let audioUrl: string | undefined;
         for (const ext of [".opus", ".wav", ".mp3", ".ogg", ".WAV", ".OPUS"]) {
@@ -399,6 +406,8 @@ export * from "./lab/phone-plan.ts";
 export * from "./lab/timing.ts";
 export * from "./lab/transpiler.ts";
 export * from "./mxl/voice-select.ts";
-export * from "./lab/flat-tts.ts";
+export * from "./lab/talkaloid.ts";
+export * from "./lab/ttm.ts";
+export * from "./lab/text-normalize.ts";
 export * from "./midi/index.ts";
 export type * from "./lab/types.ts";
