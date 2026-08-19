@@ -12,7 +12,7 @@ import type {
   TimedPhonePlan,
 } from "../../engine/vsinsy/lab/types.ts";
 
-export const PLUGIN_VERSION = "2.0.0" as const;
+export const PLUGIN_VERSION = "2.0.1" as const;
 const TRACK_SCHEMA = "amadeus.track/v2" as const;
 const PLUGIN_ID = "lang.vi.vlp" as const;
 
@@ -165,7 +165,7 @@ export function plan(track: AuthoredTrack): PhonePlan | PluginError {
 
   const planned = scoreFromTrack(track);
   const score = planned.score;
-  const events = timing.planPhoneEvents(score, transpiler);
+  const events = compensateVowelAnchors(timing.planPhoneEvents(score, transpiler));
   const sourceKeyCounts = new Map<string, number>();
   for (const event of events) {
     const key = `${event.note.id}:${event.phoneIndexInNote}`;
@@ -193,6 +193,53 @@ export function plan(track: AuthoredTrack): PhonePlan | PluginError {
     diagnostics: planned.diagnostics,
     provenance: provenance(selectedLanguage, track.languageRoute),
   };
+}
+
+function compensateVowelAnchors(events: PhoneEvent[]): PhoneEvent[] {
+  const groups: PhoneEvent[][] = [];
+  for (const event of events) {
+    const current = groups[groups.length - 1];
+    if (!current || current[0]!.note.id !== event.note.id) groups.push([event]);
+    else current.push(event);
+  }
+
+  for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+    const previous = groups[groupIndex - 1];
+    const current = groups[groupIndex]!;
+    const anchorIndex = current.findIndex((event) => event.role === "anchor");
+    if (anchorIndex <= 0) continue;
+
+    const anchor = current[anchorIndex]!;
+    const authoredStart = anchor.note.start100ns;
+    if (authoredStart === undefined || anchor.start <= authoredStart) continue;
+
+    const firstPre = current[0]!;
+    const minimumPreviousEnd = previous ? previous[0]!.start + previous.length : 0;
+    const availableShift = Math.max(0, firstPre.start - minimumPreviousEnd);
+    const shift = Math.min(anchor.start - authoredStart, availableShift);
+    if (shift <= 0) continue;
+
+    // Temporary facade compensation until the engine timing-correction hook owns vowel anchors.
+    for (let index = 0; index < anchorIndex; index += 1) {
+      current[index]!.start -= shift;
+      current[index]!.end -= shift;
+    }
+    anchor.start -= shift;
+    if (previous) closePhoneGroupAt(previous, current[0]!.start);
+  }
+
+  return events;
+}
+
+function closePhoneGroupAt(group: PhoneEvent[], end: number): void {
+  let cursor = end;
+  for (let index = group.length - 1; index >= 0; index -= 1) {
+    const event = group[index]!;
+    if (event.end <= cursor) break;
+    event.end = cursor;
+    if (event.start >= event.end) event.start = event.end - 1;
+    cursor = event.start;
+  }
 }
 
 export function finalize(

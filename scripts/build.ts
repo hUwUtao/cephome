@@ -2,6 +2,13 @@ import { spawnSync } from "child_process";
 import { copyFileSync, mkdirSync, existsSync } from "fs";
 import { copyTtmAssets } from "./copy-ttm-assets.ts";
 
+function runBuild(command: string, args: string[]): void {
+  const result = spawnSync(command, args, { stdio: "inherit" });
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
 console.log("Building frontend...");
 const feResult = spawnSync(
   "bun",
@@ -20,6 +27,9 @@ const feResult = spawnSync(
 if (feResult.status !== 0) {
   process.exit(feResult.status ?? 1);
 }
+
+console.log("Building Amadeus language plugin...");
+runBuild("bun", ["run", "build:amadeus-plugin"]);
 
 console.log("Building Windows stub...");
 const stubResult = spawnSync(

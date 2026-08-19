@@ -11,6 +11,7 @@ const entry = join(root, "plugins/lang.vi.vlp/plugin.ts");
 const outDir = resolve(root, process.argv[2] ?? "dist/amadeus-plugin");
 const outJs = join(outDir, "plugin.iife.js");
 const outToml = join(outDir, "plugin.toml");
+const pagesBaseUrl = "https://huwutao.github.io/cephome";
 
 await mkdir(outDir, { recursive: true });
 
@@ -37,7 +38,7 @@ const sha256 = createHash("sha256").update(code).digest("hex");
 const toml = `\
 protocol = "amadeus.plugin/v1"
 id = "lang.vi.vlp"
-version = "2.0.0"
+version = "2.0.1"
 name = "Vietnamese language processor"
 role = "language"
 runtime = "quickjs"
@@ -48,8 +49,8 @@ order = 10
 
 [update]
 enabled = true
-metadata_url = "https://raw.githubusercontent.com/stdpi/cephome/main/dist/amadeus-plugin/plugin.toml"
-entry_url = "https://raw.githubusercontent.com/stdpi/cephome/main/dist/amadeus-plugin/plugin.iife.js"
+metadata_url = "${pagesBaseUrl}/amadeus-plugin/plugin.toml"
+entry_url = "${pagesBaseUrl}/amadeus-plugin/plugin.iife.js"
 `;
 
 await Bun.write(outToml, toml);

@@ -147,6 +147,23 @@ function threeNoteSlur(): AuthoredTrack {
   };
 }
 
+function adjacentNotes(): AuthoredTrack {
+  return {
+    schema: "amadeus.track/v2",
+    trackId: "adjacent-voice",
+    ppq: 480,
+    tempoMap: [{ tick: 0, bpm: 120 }],
+    meterMap: [{ tick: 0, beats: 4, beatType: 4 }],
+    extent: { startTick: 0, endTick: 960 },
+    languageRoute: ["vi"],
+    notes: [
+      { id: "n1", startTick: 0, endTick: 480, pitch: 60, lyric: "a" },
+      { id: "n2", startTick: 480, endTick: 960, pitch: 62, lyric: "dạ" },
+    ],
+    gaps: [],
+  };
+}
+
 test("plugin language hook plans stable phone and gap IDs deterministically", () => {
   const first = plan(track()) as PhonePlan;
   const second = plan(track()) as PhonePlan;
@@ -167,6 +184,34 @@ test("singing lyric normalization drops punctuation before phone planning", () =
   expect(punctuated.phones.slice(0, 5).map((phone) => phone.phone)).toEqual(
     plain.phones.slice(0, 5).map((phone) => phone.phone),
   );
+});
+
+test("Amadeus facade compensates the onset so the vowel anchors at the note boundary", () => {
+  const phonePlan = plan(adjacentNotes()) as PhonePlan;
+  const previous = phonePlan.phones.findLast((phone) => phone.ownerId === "n1")!;
+  const onset = phonePlan.phones.find((phone) => phone.ownerId === "n2" && phone.role === "pre")!;
+  const anchor = phonePlan.phones.find(
+    (phone) => phone.ownerId === "n2" && phone.role === "anchor",
+  )!;
+
+  expect(anchor.start100ns).toBe(5_000_000);
+  expect(onset.end100ns).toBe(anchor.start100ns);
+  expect(onset.end100ns - onset.start100ns).toBe(400_000);
+  expect(previous.end100ns).toBe(onset.start100ns);
+});
+
+test("track-absolute preroll compensates the first note without negative timing", () => {
+  const value = adjacentNotes();
+  value.extent = { startTick: 480, endTick: 960 };
+  value.notes = [{ id: "n1", startTick: 480, endTick: 960, pitch: 62, lyric: "dạ" }];
+
+  const phonePlan = plan(value) as PhonePlan;
+  const onset = phonePlan.phones.find((phone) => phone.role === "pre")!;
+  const anchor = phonePlan.phones.find((phone) => phone.role === "anchor")!;
+
+  expect(onset.start100ns).toBe(4_600_000);
+  expect(anchor.start100ns).toBe(5_000_000);
+  expect(onset.start100ns).toBeGreaterThanOrEqual(0);
 });
 
 test("three-note slur plans one syllable across the complete authored chain", () => {

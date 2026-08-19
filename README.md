@@ -1,5 +1,7 @@
 # Cephome: Bộ chuyển ngữ giọng hát Tiếng Việt
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hUwUtao/cephome)
+
 ## Giới thiệu
 
 `cephome` là bộ chuyển ngữ thành hệ thống phiên âm Tiếng Nhật, khi sử dụng với NEUTRINO, hệ thống hỗ trợ soạn thảo lời ca hoàn toàn bằng chữ quốc ngữ. Hệ thống dịch thành dạng đọc thô Tiếng Nhật và timming sao cho tiếng hát có âm điệu và phát âm chính xác, mượt mà.
