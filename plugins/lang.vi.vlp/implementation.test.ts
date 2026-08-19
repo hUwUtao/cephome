@@ -168,6 +168,19 @@ test("plugin language hook plans stable phone and gap IDs deterministically", ()
   const first = plan(track()) as PhonePlan;
   const second = plan(track()) as PhonePlan;
   expect(first).toEqual(second);
+  expect(first).toMatchObject({
+    protocol: "amadeus.language/v2",
+    trackSchema: "amadeus.track/v2",
+    trackId: "voice-1",
+    provenance: {
+      protocol: "amadeus.language/v2",
+      moduleId: "lang.vi.vlp",
+      moduleVersion: "2.0.2",
+      bundleHash: "",
+      selectedLanguage: "vi",
+      route: ["vi"],
+    },
+  });
   expect(first.phones[0]?.id).toBe("note:n1:phone:0");
   expect(first.phones.some((phone) => phone.id === "gap:g1:phone:0")).toBe(true);
   expect(first.phones.map((phone) => phone.ownerId)).toContain("n2");
@@ -284,6 +297,7 @@ test("structured finalization is deterministic without private pitch rows", () =
   if ("kind" in first && first.kind !== "neutrino_sinsy_v1") throw new Error(first.message);
   if ("kind" in second && second.kind !== "neutrino_sinsy_v1") throw new Error(second.message);
   expect(serializeEngineScore(first)).toEqual(serializeEngineScore(second));
+  expect(first.protocol).toBe("amadeus.language/v2");
   expect(first.rows).toHaveLength(phonePlan.phones.length);
 });
 

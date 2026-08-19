@@ -12,7 +12,8 @@ import type {
   TimedPhonePlan,
 } from "../../engine/vsinsy/lab/types.ts";
 
-export const PLUGIN_VERSION = "2.0.1" as const;
+export const PLUGIN_VERSION = "2.0.2" as const;
+const LANGUAGE_PROTOCOL = "amadeus.language/v2" as const;
 const TRACK_SCHEMA = "amadeus.track/v2" as const;
 const PLUGIN_ID = "lang.vi.vlp" as const;
 
@@ -102,13 +103,17 @@ export interface PhonePlanPhone {
 }
 
 export interface ModuleProvenance {
-  pluginId: typeof PLUGIN_ID;
-  pluginVersion: typeof PLUGIN_VERSION;
+  protocol: typeof LANGUAGE_PROTOCOL;
+  moduleId: typeof PLUGIN_ID;
+  moduleVersion: typeof PLUGIN_VERSION;
+  bundleHash: string;
   selectedLanguage: string;
   route: string[];
 }
 
 export interface PhonePlan {
+  protocol: typeof LANGUAGE_PROTOCOL;
+  trackSchema: typeof TRACK_SCHEMA;
   trackId: string;
   phones: PhonePlanPhone[];
   diagnostics: Diagnostic[];
@@ -132,6 +137,7 @@ export interface EngineRow {
 
 export interface EngineScore {
   kind: "neutrino_sinsy_v1";
+  protocol: typeof LANGUAGE_PROTOCOL;
   trackId: string;
   rows: EngineRow[];
   diagnostics: Diagnostic[];
@@ -188,6 +194,8 @@ export function plan(track: AuthoredTrack): PhonePlan | PluginError {
     return { kind: "malformed", message: `unsupported phone palette: ${invalid.join(", ")}` };
   }
   return {
+    protocol: LANGUAGE_PROTOCOL,
+    trackSchema: TRACK_SCHEMA,
     trackId: track.trackId,
     phones,
     diagnostics: planned.diagnostics,
@@ -285,6 +293,7 @@ export function finalize(
   });
   return {
     kind: "neutrino_sinsy_v1",
+    protocol: LANGUAGE_PROTOCOL,
     trackId: planValue.trackId,
     rows,
     diagnostics,
@@ -669,8 +678,10 @@ function rowFromEvent(
 
 function provenance(selectedLanguage: string, route: string[]): ModuleProvenance {
   return {
-    pluginId: PLUGIN_ID,
-    pluginVersion: PLUGIN_VERSION,
+    protocol: LANGUAGE_PROTOCOL,
+    moduleId: PLUGIN_ID,
+    moduleVersion: PLUGIN_VERSION,
+    bundleHash: "",
     selectedLanguage,
     route: [...route],
   };
