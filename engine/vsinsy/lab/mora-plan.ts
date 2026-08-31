@@ -38,7 +38,7 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
       }
       const plan: TimedPhonePlan[] = [];
 
-      plan.push(...onsetPlan(parsed.onset));
+      plan.push(...onsetPlan(parsed.onset, parsed.nucleus));
       if (parsed.medial === "w") {
         plan.push({ phone: "w", role: "pre", weight: 0.22 });
       }
@@ -93,7 +93,10 @@ export class VietnameseMoraPlanTranspiler implements RoleAwareLyricTranspiler {
   }
 }
 
-function onsetPlan(onset: string): TimedPhonePlan[] {
+function onsetPlan(onset: string, nucleus: string): TimedPhonePlan[] {
+  if (onset === "gi" && nucleus === "i") {
+    return [{ phone: "j", role: "pre", weight: 1 }];
+  }
   if (onset === "th") {
     return [
       { phone: "t", role: "pre", weight: 0.7 },

@@ -10,6 +10,14 @@ test("segment: ba (basic CV)", () => {
   expect(result.coda).toBe("");
 });
 
+test("segment: bare gi retains its i nucleus", () => {
+  const result = segmentSyllable("gì");
+  expect(result.onset).toBe("gi");
+  expect(result.nucleus).toBe("i");
+  expect(result.coda).toBe("");
+  expect(result.tone).toBe(1);
+});
+
 test("segment: ăn (null onset, nasal coda)", () => {
   const result = segmentSyllable("ăn");
   expect(result.onset).toBe("");

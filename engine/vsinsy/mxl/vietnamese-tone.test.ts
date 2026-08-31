@@ -59,6 +59,15 @@ test("Vietnamese tonal aware phonemes (cl for tones 4 and 5)", () => {
   expect(may.phones).not.toContain("cl");
 });
 
+test("gi plus i emits the palatal branch", () => {
+  const transpiler = new VietnameseMoraPlanTranspiler();
+
+  expect(transpiler.plan("gì").phones).toEqual(["j", "i"]);
+  expect(transpiler.plan("gìn").phones).toEqual(["j", "i", "N"]);
+  expect(transpiler.plan("gít").phones).toEqual(["j", "i", "t"]);
+  expect(transpiler.plan("gịn").phones).toEqual(["j", "i", "N", "cl"]);
+});
+
 test("Tonal pitch microtoning calculation", () => {
   const note: ScoreNote = {
     id: "P1:1:0",

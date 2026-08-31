@@ -32,6 +32,7 @@ const ONSET_LIST = [
 ];
 
 const CODA_LIST = ["ng", "nh", "ch", "m", "n", "p", "t", "c", "i", "y", "o", "u"];
+const BARE_GI_CODA_LIST = ["ng", "nh", "ch", "m", "n", "p", "t", "c"];
 
 export function segmentSyllable(raw: string): ParsedSyllable {
   const tone = extractTone(raw);
@@ -39,6 +40,11 @@ export function segmentSyllable(raw: string): ParsedSyllable {
 
   if (!normalized) {
     throw new Error(`Cannot segment empty syllable (input: "${raw}")`);
+  }
+
+  const bareGiCoda = BARE_GI_CODA_LIST.find((coda) => normalized === `gi${coda}`);
+  if (normalized === "gi" || bareGiCoda) {
+    return { raw, onset: "gi", medial: "", nucleus: "i", coda: bareGiCoda ?? "", tone };
   }
 
   let remaining = normalized;
