@@ -213,6 +213,24 @@ test("Amadeus facade compensates the onset so the vowel anchors at the note boun
   expect(previous.end100ns).toBe(onset.start100ns);
 });
 
+test("long nh onset avoids sustaining the palatal nasal color", () => {
+  const value = track();
+  value.notes = [
+    { id: "n1", startTick: 0, endTick: 240, pitch: 60, lyric: "nhà" },
+    { id: "n2", startTick: 240, endTick: 1440, pitch: 64, lyric: "những" },
+  ];
+  value.gaps = [];
+  value.extent = { startTick: 0, endTick: 1440 };
+
+  const phonePlan = plan(value) as PhonePlan;
+  const shortPhones = phonePlan.phones.filter((phone) => phone.ownerId === "n1");
+  const longPhones = phonePlan.phones.filter((phone) => phone.ownerId === "n2");
+
+  expect(shortPhones.map((phone) => phone.phone)).toContain("ny");
+  expect(longPhones.map((phone) => phone.phone)).not.toContain("ny");
+  expect(longPhones[0]?.phone).toBe("n");
+});
+
 test("track-absolute preroll compensates the first note without negative timing", () => {
   const value = adjacentNotes();
   value.extent = { startTick: 480, endTick: 960 };

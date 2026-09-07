@@ -51,6 +51,10 @@ test("transcribe: hoa labialized", () => {
   expect(transcribeSyllable("hoa")).toBe("h,u,a");
 });
 
+test("transcribe: hôi does not invent a medial glide", () => {
+  expect(transcribeSyllable("hôi")).toBe("h,o,i");
+});
+
 test("transcribe: hoàng labialized + nasal", () => {
   expect(transcribeSyllable("hoàng")).toBe("h,u,a,n,g");
 });

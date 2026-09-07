@@ -60,6 +60,14 @@ test("segment: hoa (labialized onset)", () => {
   expect(result.nucleus).toBe("a");
 });
 
+test("segment: hôi keeps ôi as a vowel plus glide coda", () => {
+  const result = segmentSyllable("hôi");
+  expect(result.onset).toBe("h");
+  expect(result.medial).toBe("");
+  expect(result.nucleus).toBe("ô");
+  expect(result.coda).toBe("i");
+});
+
 test("segment: hoàng (labialized + nasal coda)", () => {
   const result = segmentSyllable("hoàng");
   expect(result.onset).toBe("h");

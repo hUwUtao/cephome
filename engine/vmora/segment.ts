@@ -70,7 +70,11 @@ export function segmentSyllable(raw: string): ParsedSyllable {
     if (["u", "ư", "o", "ô"].includes(firstChar)) {
       const afterGlide: string = remaining[1] as string;
       // Only mark as medial if followed by a vowel
-      if (afterGlide && "aeiouăâêôơư".includes(afterGlide)) {
+      if (
+        afterGlide &&
+        "aeiouăâêôơư".includes(afterGlide) &&
+        !(firstChar === "ô" && afterGlide === "i")
+      ) {
         medial = "w";
         remaining = remaining.slice(1);
       }

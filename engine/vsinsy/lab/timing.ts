@@ -187,12 +187,23 @@ function planForNote(note: ScoreNote, lyricTranspiler: LyricTranspiler): TimedPh
     plan = phonesToPlan(note.lyric ? lyricTranspiler.transpile(note.lyric).phones : []);
   }
 
+  plan = shortenLongPalatalNasal(plan, note);
+
   if (note.codaSuppress) {
     plan = plan.filter((item) => item.role !== "tail");
   }
 
   if (note.hasBreath) plan = [...plan, { phone: "br", role: "breath", weight: 0.4 }];
   return plan;
+}
+
+function shortenLongPalatalNasal(plan: TimedPhonePlan[], note: ScoreNote): TimedPhonePlan[] {
+  if (!note.lyric || note.durationDiv <= 0 || note.divisions <= 0 || note.tempo <= 0) return plan;
+  const durationSeconds = (note.durationDiv / note.divisions) * (60 / note.tempo);
+  if (durationSeconds < 0.65) return plan;
+  return plan.map((item) =>
+    item.phone === "ny" && item.role === "pre" ? { ...item, phone: "n" } : item,
+  );
 }
 
 function restPhone(note: ScoreNote): "pau" | "sil" | "br" {
