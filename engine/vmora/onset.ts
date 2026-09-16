@@ -7,11 +7,11 @@ const ONSET_MAP: Record<string, string[]> = {
   ngh: ["n", "g"], // velar nasal proxy
   ng: ["n", "g"],
   nh: ["ny"],
-  ch: ["ch"],
-  tr: ["ch"],
+  ch: ["ch", "cl"],
+  tr: ["ch", "cl"],
   th: ["ty"],
-  ph: ["f"],
-  kh: ["k"], // 'k' has more bite than 'h'
+  ph: ["p", "cl"],
+  kh: ["k", "cl"],
   gi: ["z"],
   gh: ["g"],
   qu: ["k"], // 'w' glide is handled by medial-w plan

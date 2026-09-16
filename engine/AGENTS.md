@@ -21,18 +21,18 @@ echo "Nào bạn" | bun run cli.ts  # Pipe Vietnamese → phonetics
 
 ### Onsets (Vietnamese grapheme → CeVIO phoneme)
 
-| Grapheme          | Output      | Notes                             |
-| ----------------- | ----------- | --------------------------------- |
-| `ngh`, `ng`       | `["n","g"]` | Velar nasal as separate mora      |
-| `nh`              | `["ny"]`    | Palatal nasal /ɲ/                 |
-| `th`              | `["ty"]`    | Aspirated → palatalized mora      |
-| `ch`, `tr`        | `["ch"]`    | Affricate                         |
-| `ph`              | `["f"]`     | Fricative                         |
-| `kh`              | `["k"]`     | Aspirated → plain                 |
-| `gi`              | `["z"]`     | Northern Vietnamese               |
-| `qu`              | `["k"]`     | + medial `w`                      |
-| Single consonants | mapped      | `l→r`, `r→z`, `đ→d`, `c→k`, `x→s` |
-| `""`              | `[]`        | Null onset                        |
+| Grapheme          | Output        | Notes                             |
+| ----------------- | ------------- | --------------------------------- |
+| `ngh`, `ng`       | `["n","g"]`   | Velar nasal as separate mora      |
+| `nh`              | `["ny"]`      | Palatal nasal /ɲ/                 |
+| `th`              | `["ty"]`      | Aspirated → palatalized mora      |
+| `ch`, `tr`        | `["ch","cl"]` | Affricate + closure               |
+| `ph`              | `["p","cl"]`  | Blowing labial + closure          |
+| `kh`              | `["k","cl"]`  | Blowing velar + closure           |
+| `gi`              | `["z"]`       | Northern Vietnamese               |
+| `qu`              | `["k"]`       | + medial `w`                      |
+| Single consonants | mapped        | `l→r`, `r→z`, `đ→d`, `c→k`, `x→s` |
+| `""`              | `[]`          | Null onset                        |
 
 **Segmentation order** (longest-first): `ngh` → `ng` → `nh` → single chars
 

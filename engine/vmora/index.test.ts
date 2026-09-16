@@ -7,7 +7,7 @@ test("research: kiên", () => {
 });
 
 test("research: phương", () => {
-  expect(transcribeSyllable("phương")).toBe("f,u,o,n,g");
+  expect(transcribeSyllable("phương")).toBe("p,cl,u,o,n,g");
 });
 
 test("research: dương", () => {
@@ -64,7 +64,7 @@ test("transcribe: xuân", () => {
 });
 
 test("transcribe: chiêng", () => {
-  expect(transcribeSyllable("chiêng")).toBe("ch,i,e,n,g");
+  expect(transcribeSyllable("chiêng")).toBe("ch,cl,i,e,n,g");
 });
 
 test("transcribe: tiết", () => {
@@ -76,7 +76,7 @@ test("transcribe: mướp", () => {
 });
 
 test("transcribe: phước", () => {
-  expect(transcribeSyllable("phước")).toBe("f,u,o,k");
+  expect(transcribeSyllable("phước")).toBe("p,cl,u,o,k");
 });
 
 // Coda variations
@@ -148,8 +148,8 @@ test("voicevox: kiên (nasal n → N)", () => {
   expect(transcribeSyllable("kiên", "voicevox")).toBe("k,i,e,N");
 });
 
-test("voicevox: phương (ph → f onset, nasal ng → N)", () => {
-  expect(transcribeSyllable("phương", "voicevox")).toBe("f,u,o,N");
+test("voicevox: phương (ph → p,cl onset, nasal ng → N)", () => {
+  expect(transcribeSyllable("phương", "voicevox")).toBe("p,cl,u,o,N");
 });
 
 test("voicevox: thác (th → ty onset, stop t → cl)", () => {

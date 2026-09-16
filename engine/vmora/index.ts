@@ -164,7 +164,7 @@ export function transcribe(
  * Mode 'voicevox' produces VOICEVOX-legal mora tokens.
  *
  * @example transcribeText("kiên phương")
- * → "k,i,e,N,j|f,w,o,N"
+ * → "k,i,e,N,j|p,cl,w,o,N"
  */
 export function transcribeText(
   text: string,

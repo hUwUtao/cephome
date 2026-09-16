@@ -11,7 +11,7 @@ import { transcribeSyllable, transcribeWord, transcribe, transcribeText } from "
 transcribeSyllable("kiên"); // → "k,i,e,N"
 
 // Text with multiple words
-transcribeText("kiên phương"); // → "k,i,e,N\nf,w,o,N"
+transcribeText("kiên phương"); // → "k,i,e,N\np,cl,w,o,N"
 
 // Structured result
 transcribe("kiên phương");
@@ -19,7 +19,7 @@ transcribe("kiên phương");
 //   input: "kiên phương",
 //   lines: [
 //     { word: "kiên", syllables: [{ raw: "kiên", phonemes: "k,i,e,N" }] },
-//     { word: "phương", syllables: [{ raw: "phương", phonemes: "f,w,o,N" }] }
+//     { word: "phương", syllables: [{ raw: "phương", phonemes: "p,cl,w,o,N" }] }
 //   ]
 // }
 ```
@@ -34,7 +34,7 @@ Converts a single Vietnamese syllable to comma-separated CeVIO phoneme symbols.
 
 ```typescript
 transcribeSyllable("kiên"); // "k,i,e,N"
-transcribeSyllable("phương"); // "f,w,o,N"
+transcribeSyllable("phương"); // "p,cl,w,o,N"
 ```
 
 ### `transcribeWord(word: string): string[]`
@@ -54,7 +54,7 @@ Transcribes text and returns newline-separated lines (one per word) with syllabl
 ```typescript
 transcribeText("kiên phương dương");
 // "k,i,e,N"
-// "f,w,o,N"
+// "p,cl,w,o,N"
 // "z,w,o,N"
 ```
 
@@ -83,7 +83,7 @@ Output is constrained to the CeVIO Japanese Song Voice palette:
 **Core research.md examples (100% pass):**
 
 - kiên → k,i,e,N
-- phương → f,w,o,N
+- phương → p,cl,w,o,N
 - dương → z,w,o,N
 - vãng → v,a,N
 - dinh → z,i,N

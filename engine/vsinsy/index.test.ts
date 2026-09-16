@@ -474,7 +474,7 @@ test("vocal normalizer selects lyric voice, merges ties, carries slur vowel, dro
 
 test("Vietnamese transpiler emits Sinsy-safe phones", () => {
   const result = new VietnameseSinsyLyricTranspiler().transpile("phương");
-  expect(result.phones).toEqual(["f", "u", "o", "N"]);
+  expect(result.phones).toEqual(["p", "cl", "u", "o", "N"]);
   expect(result.warnings).toEqual([]);
 });
 

@@ -155,9 +155,17 @@ test("Sinsy singing plan keeps checked codas without artificial support glides",
   expect(transpiler.plan("thênh").phones).toEqual(["t", "h", "e", "N"]);
   expect(transpiler.plan("tôi").phones).toEqual(["t", "o", "i"]);
   expect(transpiler.plan("xuôi").phones).toEqual(["s", "w", "o", "i"]);
-  expect(transpiler.plan("chung").phones).toEqual(["ch", "u", "N", "g"]);
-  expect(transpiler.plan("trên").phones).toEqual(["ch", "e", "N"]);
+  expect(transpiler.plan("chung").phones).toEqual(["ch", "cl", "u", "N", "g"]);
+  expect(transpiler.plan("trên").phones).toEqual(["ch", "cl", "e", "N"]);
   expect(transpiler.plan("thoáng").phones).toEqual(["t", "h", "o", "a", "N", "g"]);
+});
+
+test("Sinsy singing plan keeps blowing-onset closures brief", () => {
+  const transpiler = new VietnameseMoraPlanTranspiler();
+
+  expect(transpiler.plan("khát").phones).toEqual(["k", "cl", "a", "t"]);
+  expect(transpiler.plan("phê").phones).toEqual(["p", "cl", "e"]);
+  expect(transpiler.plan("chung").plan[1]?.weight).toBe(0.45);
 });
 
 test("Vietnamese plan exposes research metadata tiers", () => {

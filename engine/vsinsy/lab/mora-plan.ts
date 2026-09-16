@@ -103,7 +103,11 @@ function onsetPlan(onset: string, nucleus: string): TimedPhonePlan[] {
       { phone: "h", role: "pre", weight: 0.45 },
     ];
   }
-  return onsetToPhonemes(onset).map((phone) => ({ phone, role: "pre", weight: 1 }));
+  return onsetToPhonemes(onset).map((phone) => ({
+    phone,
+    role: "pre",
+    weight: phone === "cl" ? 0.45 : 1,
+  }));
 }
 
 function codaPhones(coda: string, tone: number, mode: SinsyVietnameseMode): string[] {
