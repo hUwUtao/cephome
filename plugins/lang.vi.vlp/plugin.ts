@@ -244,7 +244,7 @@ plugin("lang.vi.vlp")
     finalize(plan, timingEdits) {
       void this.params.showPhoneSplits;
       const edits = (timingEdits ?? []) as TimingEdit[];
-      return unwrapScore(finalizeLang(plan as PhonePlan, edits));
+      return unwrapScore(finalizeLang(plan as unknown as PhonePlan, edits));
     },
   })
   .member("tone", (b) =>

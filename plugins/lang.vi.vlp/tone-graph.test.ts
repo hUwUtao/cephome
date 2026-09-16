@@ -38,6 +38,8 @@ globalThis.__plugin = (_id, definition) => {
   definitions.push(definition);
   return definition;
 };
+globalThis.__amadeusSchemaVersion = 2;
+globalThis.__amadeusHostVersion = "0.1.0-beta.3";
 
 await import("./plugin.ts");
 const plugin = definitions[0];
@@ -45,6 +47,7 @@ if (!plugin) throw new Error("plugin did not register");
 const tone = plugin.members?.find((member) => member.id === ".tone");
 const postPitch = tone?.postPitch;
 if (!postPitch) throw new Error("tone member did not register post_pitch");
+const registeredPostPitch: PostPitchHook = postPitch;
 
 function hzToCents(hz: number, reference: number): number {
   return 1200 * Math.log2(hz / reference);
@@ -132,7 +135,7 @@ const amount = 50;
 // --- live IIFE must match math bit-for-bit (cents) ---
 async function liveCents(tone: number, cfg: Record<string, unknown>): Promise<number[]> {
   const f0 = new Float32Array(frames).fill(220);
-  const result = postPitch.call(
+  const result = registeredPostPitch.call(
     { parent: { params: cfg as Record<string, boolean | number> } },
     {
       f0,
@@ -252,8 +255,8 @@ for (const c of cases) {
     alignment: Array.from({ length: frames }, () => 1),
     labels: [{ phone: "a", fullContext: mono(1) }],
   };
-  const aResult = postPitch.call({ parent: { params: base } }, ctx);
-  const bResult = postPitch.call(
+  const aResult = registeredPostPitch.call({ parent: { params: base } }, ctx);
+  const bResult = registeredPostPitch.call(
     { parent: { params: { ...base, offtoneCompensation: 100 } } },
     { ...ctx, f0: new Float32Array(f0up) },
   );

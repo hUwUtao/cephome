@@ -7,92 +7,8 @@ import {
   type PhonePlan,
 } from "./implementation.ts";
 
-const CONTEXT_SEPARATORS = {
-  p: ["", "@", "^", "-", "+", "=", "_", "%", "^", "_", "~", "-", "!", "[", "$", "]"],
-  a: ["/A:", "-", "-", "@", "~"],
-  b: ["/B:", "_", "_", "@", "|"],
-  c: ["/C:", "+", "+", "@", "&"],
-  d: ["/D:", "!", "#", "$", "%", "|", "&", ";", "-"],
-  e: [
-    "/E:",
-    "]",
-    "^",
-    "=",
-    "~",
-    "!",
-    "@",
-    "#",
-    "+",
-    "]",
-    "$",
-    "|",
-    "[",
-    "&",
-    "]",
-    "=",
-    "^",
-    "~",
-    "#",
-    "_",
-    ";",
-    "$",
-    "&",
-    "%",
-    "[",
-    "|",
-    "]",
-    "-",
-    "^",
-    "+",
-    "~",
-    "=",
-    "@",
-    "$",
-    "!",
-    "%",
-    "#",
-    "|",
-    "|",
-    "-",
-    "&",
-    "&",
-    "+",
-    "[",
-    ";",
-    "]",
-    ";",
-    "~",
-    "~",
-    "^",
-    "^",
-    "@",
-    "[",
-    "#",
-    "=",
-    "!",
-    "~",
-    "+",
-    "!",
-    "^",
-  ],
-  f: ["/F:", "#", "#", "-", "$", "$", "+", "%", ";"],
-  g: ["/G:", "_"],
-  h: ["/H:", "_"],
-  i: ["/I:", "_"],
-  j: ["/J:", "~", "@"],
-} as const;
-
 function serializeEngineScore(score: EngineScore): string[] {
-  return score.rows.map((row) => {
-    let context = "";
-    for (const group of Object.keys(CONTEXT_SEPARATORS) as Array<keyof typeof CONTEXT_SEPARATORS>) {
-      const values = row.contexts[group];
-      context += CONTEXT_SEPARATORS[group]
-        .map((separator, index) => `${separator}${values[index]}`)
-        .join("");
-    }
-    return `${row.start100ns} ${row.end100ns} ${context}`;
-  });
+  return score.rows.map((row) => `${row.start} ${row.end} ${row.phoneme}`);
 }
 
 function track(): AuthoredTrack {
@@ -175,7 +91,7 @@ test("plugin language hook plans stable phone and gap IDs deterministically", ()
     provenance: {
       protocol: "amadeus.language/v2",
       moduleId: "lang.vi.vlp",
-      moduleVersion: "2.0.2",
+      moduleVersion: "2.0.3",
       bundleHash: "",
       selectedLanguage: "vi",
       route: ["vi"],
@@ -183,6 +99,10 @@ test("plugin language hook plans stable phone and gap IDs deterministically", ()
   });
   expect(first.phones[0]?.id).toBe("note:n1:phone:0");
   expect(first.phones.some((phone) => phone.id === "gap:g1:phone:0")).toBe(true);
+  expect(first.phones.every((phone) => "start" in phone && "end" in phone)).toBe(true);
+  expect(first.phones.every((phone) => !("start100ns" in phone) && !("end100ns" in phone))).toBe(
+    true,
+  );
   expect(first.phones.map((phone) => phone.ownerId)).toContain("n2");
 });
 
@@ -207,10 +127,10 @@ test("Amadeus facade compensates the onset so the vowel anchors at the note boun
     (phone) => phone.ownerId === "n2" && phone.role === "anchor",
   )!;
 
-  expect(anchor.start100ns).toBe(5_000_000);
-  expect(onset.end100ns).toBe(anchor.start100ns);
-  expect(onset.end100ns - onset.start100ns).toBe(400_000);
-  expect(previous.end100ns).toBe(onset.start100ns);
+  expect(anchor.start).toBe(5_000_000);
+  expect(onset.end).toBe(anchor.start);
+  expect(onset.end - onset.start).toBe(400_000);
+  expect(previous.end).toBe(onset.start);
 });
 
 test("long nh onset avoids sustaining the palatal nasal color", () => {
@@ -240,9 +160,9 @@ test("track-absolute preroll compensates the first note without negative timing"
   const onset = phonePlan.phones.find((phone) => phone.role === "pre")!;
   const anchor = phonePlan.phones.find((phone) => phone.role === "anchor")!;
 
-  expect(onset.start100ns).toBe(4_600_000);
-  expect(anchor.start100ns).toBe(5_000_000);
-  expect(onset.start100ns).toBeGreaterThanOrEqual(0);
+  expect(onset.start).toBe(4_600_000);
+  expect(anchor.start).toBe(5_000_000);
+  expect(onset.start).toBeGreaterThanOrEqual(0);
 });
 
 test("three-note slur plans one syllable across the complete authored chain", () => {
@@ -261,7 +181,7 @@ test("three-note slur plans one syllable across the complete authored chain", ()
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
   expect(result.rows).toHaveLength(phonePlan.phones.length);
   expect(result.rows.every((row) => row.segmentIndex === 0)).toBe(true);
-  expect(result.rows.every((row) => row.contexts.e[58] === "0")).toBe(true);
+  expect(result.rows.every((row) => !("contexts" in row))).toBe(true);
 });
 
 test("long slur coda coverage may exclude the primary lyric note", () => {
@@ -317,38 +237,39 @@ test("structured finalization is deterministic without private pitch rows", () =
   expect(serializeEngineScore(first)).toEqual(serializeEngineScore(second));
   expect(first.protocol).toBe("amadeus.language/v2");
   expect(first.rows).toHaveLength(phonePlan.phones.length);
+  expect(first.rows.every((row) => "start" in row && "end" in row)).toBe(true);
+  expect(first.rows.every((row) => !("start100ns" in row) && !("end100ns" in row))).toBe(true);
 });
 
 test("finalize applies phone-ID edits and reports obsolete IDs", () => {
   const phonePlan = plan(track()) as PhonePlan;
   const edited = phonePlan.phones[1]!;
   const result = finalize(phonePlan, [
-    { phoneId: edited.id, boundaryOffset100ns: 10_000 },
-    { phoneId: "note:gone:phone:0", boundaryOffset100ns: 1 },
+    { phoneId: edited.id, boundaryOffset: 10_000 },
+    { phoneId: "note:gone:phone:0", boundaryOffset: 1 },
   ]);
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
-  expect(result.rows.find((row) => row.sourcePhoneId === edited.id)?.start100ns).toBe(
-    edited.start100ns + 10_000,
+  expect(result.rows.find((row) => row.sourcePhoneId === edited.id)?.start).toBe(
+    edited.start + 10_000,
   );
   expect(result.diagnostics.some((diagnostic) => diagnostic.code === "obsolete_timing_edit")).toBe(
     true,
   );
 });
 
-test("finalize preserves one continuous pause stream and typed context widths", () => {
+test("finalize preserves one continuous pause stream without Sinsy contexts", () => {
   const phonePlan = plan(track()) as PhonePlan;
   const result = finalize(phonePlan);
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
   const pause = result.rows.findIndex((row) => row.phoneme === "pau");
   expect(pause).toBeGreaterThan(0);
   expect(pause).toBeLessThan(result.rows.length - 1);
-  expect(result.rows[pause - 1]!.end100ns).toBe(result.rows[pause]!.start100ns);
-  expect(result.rows[pause]!.end100ns).toBe(result.rows[pause + 1]!.start100ns);
-  expect(result.rows[0]!.contexts.p).toHaveLength(16);
-  expect(result.rows[0]!.contexts.e).toHaveLength(60);
+  expect(result.rows[pause - 1]!.end).toBe(result.rows[pause]!.start);
+  expect(result.rows[pause]!.end).toBe(result.rows[pause + 1]!.start);
+  expect(result.rows.every((row) => !("contexts" in row))).toBe(true);
 });
 
-test("long sentences preserve pau, sil, and br context and timing identity", () => {
+test("long sentences preserve pau, sil, and br timing identity", () => {
   const value = track();
   value.extent.endTick = 2280;
   value.notes = [
@@ -364,26 +285,23 @@ test("long sentences preserve pau, sil, and br context and timing identity", () 
   ];
   const phonePlan = plan(value) as PhonePlan;
   const edited = phonePlan.phones.find((phone) => phone.ownerId === "n3")!;
-  const result = finalize(phonePlan, [{ phoneId: edited.id, boundaryOffset100ns: 10_000 }]);
+  const result = finalize(phonePlan, [{ phoneId: edited.id, boundaryOffset: 10_000 }]);
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
 
   const orderedSourcePhones = result.rows
     .map((row) => row.sourcePhoneId)
     .filter((id, index, all) => index === 0 || id !== all[index - 1]);
   expect(orderedSourcePhones).toEqual(phonePlan.phones.map((phone) => phone.id));
-  expect(result.rows.find((row) => row.sourcePhoneId === edited.id)?.start100ns).toBe(
-    edited.start100ns + 10_000,
+  expect(result.rows.find((row) => row.sourcePhoneId === edited.id)?.start).toBe(
+    edited.start + 10_000,
   );
   for (const kind of ["pau", "sil", "br"]) {
     const index = result.rows.findIndex((row) => row.phoneme === kind);
     expect(index).toBeGreaterThan(0);
     expect(index).toBeLessThan(result.rows.length - 1);
-    expect(result.rows[index]!.contexts.p[2]).toBe(result.rows[index - 1]!.phoneme);
-    expect(result.rows[index]!.contexts.p[3]).toBe(kind);
-    expect(result.rows[index]!.contexts.p[4]).toBe(result.rows[index + 1]!.phoneme);
   }
   for (let index = 1; index < result.rows.length; index += 1) {
-    expect(result.rows[index - 1]!.end100ns).toBe(result.rows[index]!.start100ns);
+    expect(result.rows[index - 1]!.end).toBe(result.rows[index]!.start);
   }
 });
 

@@ -13,7 +13,7 @@
  *
  * @module
  */
-import { F0Data, FRAME_RATE, F0_SILENCE } from "./types";
+import { FRAME_RATE, F0_SILENCE, type F0Data } from "./types";
 
 /** Maximum plausible Hz for sanity check */
 const MAX_PLAUSIBLE_HZ = 2000;

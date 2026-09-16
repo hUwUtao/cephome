@@ -1,4 +1,3 @@
-import { sinsyContextGroups, type SinsyContextGroups } from "../../engine/vsinsy/lab/emitters.ts";
 import { VietnameseMoraPlanTranspiler } from "../../engine/vsinsy/lab/mora-plan.ts";
 import { classifyPhone, validateSinsyPhones } from "../../engine/vsinsy/lab/phoneme.ts";
 import { pitchName } from "../../engine/vsinsy/lab/pitch-name.ts";
@@ -12,7 +11,7 @@ import type {
   TimedPhonePlan,
 } from "../../engine/vsinsy/lab/types.ts";
 
-export const PLUGIN_VERSION = "2.0.2" as const;
+export const PLUGIN_VERSION = "2.0.3" as const;
 const LANGUAGE_PROTOCOL = "amadeus.language/v2" as const;
 const TRACK_SCHEMA = "amadeus.track/v2" as const;
 const PLUGIN_ID = "lang.vi.vlp" as const;
@@ -70,7 +69,7 @@ export interface AuthoredTrack {
 
 export interface TimingEdit {
   phoneId: string;
-  boundaryOffset100ns: number;
+  boundaryOffset: number;
 }
 
 export interface Diagnostic {
@@ -92,8 +91,8 @@ export interface PhonePlanPhone {
   ghost: boolean;
   vacuum: boolean;
   velocity?: number;
-  start100ns: number;
-  end100ns: number;
+  start: number;
+  end: number;
   sourceIndex: number;
   sourceCount: number;
   tone: number;
@@ -124,15 +123,14 @@ export interface EngineRow {
   rowId: string;
   sourcePhoneId: string;
   segmentIndex: number;
-  start100ns: number;
-  end100ns: number;
+  start: number;
+  end: number;
   phoneme: string;
   noteId?: string;
   gapId?: string;
   scoreStartTick: number;
   scoreEndTick: number;
   midi: number | null;
-  contexts: SinsyContextGroups;
 }
 
 export interface EngineScore {
@@ -275,7 +273,7 @@ export function finalize(
       continue;
     }
     const event = events[index]!;
-    const proposed = event.start + edit.boundaryOffset100ns;
+    const proposed = event.start + edit.boundaryOffset;
     const lower = index === 0 ? 0 : events[index - 1]!.start + 1;
     const upper = index + 1 < events.length ? events[index + 1]!.start - 1 : event.end - 1;
     event.start = Math.max(lower, Math.min(proposed, upper));
@@ -605,8 +603,8 @@ function phoneFromEvent(
     ghost: event.ghost ?? false,
     vacuum: event.vacuum ?? false,
     velocity: event.velocity,
-    start100ns: event.start,
-    end100ns: event.end,
+    start: event.start,
+    end: event.end,
     sourceIndex,
     sourceCount,
     tone: event.tone,
@@ -618,8 +616,8 @@ function phoneFromEvent(
 
 function eventFromPhone(phone: PhonePlanPhone, phoneCountInNote: number): PhoneEvent {
   return {
-    start: phone.start100ns,
-    end: phone.end100ns,
+    start: phone.start,
+    end: phone.end,
     phoneme: phone.phone,
     cls: classifyPhone(phone.phone),
     role: phone.role,
@@ -658,21 +656,18 @@ function rowFromEvent(
   segmentIndex: number,
 ): EngineRow {
   const event = events[index]!;
-  const contexts = sinsyContextGroups(events, index);
-  contexts.e[58] = "0";
   return {
     rowId: `${sourcePhoneId}:segment:${segmentIndex}`,
     sourcePhoneId,
     segmentIndex,
-    start100ns: event.start,
-    end100ns: event.end,
+    start: event.start,
+    end: event.end,
     phoneme: event.phoneme,
     noteId: event.note.isRest ? undefined : event.note.id,
     gapId: event.note.isRest ? event.note.id : undefined,
     scoreStartTick: event.note.startDiv,
     scoreEndTick: event.note.endDiv,
     midi: event.note.pitch?.midi ?? null,
-    contexts,
   };
 }
 

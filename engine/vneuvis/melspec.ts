@@ -14,7 +14,7 @@
  *
  * @module
  */
-import { MelSpecData, FRAME_RATE, N_MEL_BINS, MEL_SILENCE } from "./types";
+import { FRAME_RATE, MEL_SILENCE, N_MEL_BINS, type MelSpecData } from "./types";
 
 /** Minimum plausible log-mel value */
 const MIN_PLAUSIBLE = -20;

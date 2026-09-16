@@ -39,7 +39,7 @@ export function App() {
 
   const [output, setOutput] = useState("");
   const [copyStatus, setCopyStatus] = useState("Sao chép");
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     try {

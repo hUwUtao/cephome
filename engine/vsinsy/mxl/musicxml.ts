@@ -328,7 +328,7 @@ function playbackPath(measures: ParsedMeasure[]): PlaybackMeasure[] {
     ? secondPath.findIndex(({ measure }) => measure.tocoda === targetCoda)
     : -1;
 
-  if (codaJump !== -1) {
+  if (targetCoda && codaJump !== -1) {
     const coda = findCoda(measures, targetCoda);
     return [
       ...firstPath.slice(0, jump + 1),

@@ -14,7 +14,7 @@
  *
  * @module
  */
-import { PhonemeSegment, FRAME_DURATION } from "./types";
+import { FRAME_DURATION, type PhonemeSegment } from "./types";
 
 const LINE_RE = /^(\d+)\s+(\d+)\s+(\S+)/;
 
