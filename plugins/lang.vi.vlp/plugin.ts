@@ -85,9 +85,12 @@ function extractControl(context: string): ToneControl | null {
   const ePrefix = context.slice(0, eEnd);
   const centsEnd = ePrefix.lastIndexOf("^");
   if (centsEnd < 0) return null;
-  const centsStart = ePrefix.slice(0, centsEnd).lastIndexOf("!") + 1;
-  if (centsStart <= 0) return null;
-  const cents = parseFloat(ePrefix.slice(centsStart, centsEnd));
+  // Older labels encoded an optional cents value as `!<cents>^`. Current
+  // Sinsy labels use the E-field's own grammar (`...E:X4]4^0=...`) and have
+  // no cents token here. Tone shaping does not consume this legacy value, so
+  // treat its absence as zero instead of discarding the whole control.
+  const legacyCents = ePrefix.match(/!(-?\d+(?:\.\d+)?)\^/);
+  const cents = legacyCents ? parseFloat(legacyCents[1]!) : 0;
   if (!isFinite(cents) || Math.abs(cents) > 120) return null;
 
   // p[0] class + central phoneme:  v@xx^n-a+o=…  → cls=v, phone=a

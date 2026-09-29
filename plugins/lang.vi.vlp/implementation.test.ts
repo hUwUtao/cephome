@@ -181,7 +181,7 @@ test("three-note slur plans one syllable across the complete authored chain", ()
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
   expect(result.rows).toHaveLength(phonePlan.phones.length);
   expect(result.rows.every((row) => row.segmentIndex === 0)).toBe(true);
-  expect(result.rows.every((row) => !("contexts" in row))).toBe(true);
+  expect(result.rows.every((row) => row.contexts !== undefined)).toBe(true);
 });
 
 test("long slur coda coverage may exclude the primary lyric note", () => {
@@ -257,7 +257,7 @@ test("finalize applies phone-ID edits and reports obsolete IDs", () => {
   );
 });
 
-test("finalize preserves one continuous pause stream without Sinsy contexts", () => {
+test("finalize preserves one continuous pause stream with Sinsy contexts", () => {
   const phonePlan = plan(track()) as PhonePlan;
   const result = finalize(phonePlan);
   if ("kind" in result && result.kind !== "neutrino_sinsy_v1") throw new Error(result.message);
@@ -266,7 +266,7 @@ test("finalize preserves one continuous pause stream without Sinsy contexts", ()
   expect(pause).toBeLessThan(result.rows.length - 1);
   expect(result.rows[pause - 1]!.end).toBe(result.rows[pause]!.start);
   expect(result.rows[pause]!.end).toBe(result.rows[pause + 1]!.start);
-  expect(result.rows.every((row) => !("contexts" in row))).toBe(true);
+  expect(result.rows.every((row) => row.contexts !== undefined)).toBe(true);
 });
 
 test("long sentences preserve pau, sil, and br timing identity", () => {

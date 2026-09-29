@@ -2,6 +2,7 @@ import { VietnameseMoraPlanTranspiler } from "../../engine/vsinsy/lab/mora-plan.
 import { classifyPhone, validateSinsyPhones } from "../../engine/vsinsy/lab/phoneme.ts";
 import { pitchName } from "../../engine/vsinsy/lab/pitch-name.ts";
 import { VowelAnchoredTimingStrategy } from "../../engine/vsinsy/lab/timing.ts";
+import { sinsyContextGroups } from "../../engine/vsinsy/lab/emitters.ts";
 import { canonicalizeSingingLyric } from "../../engine/vmora/normalize.ts";
 import type {
   PhoneEvent,
@@ -43,7 +44,6 @@ export interface AuthoredNote {
   phoneOverride?: string[];
   pitchExpression?: JsonValue;
   vibrato?: JsonValue;
-  extensions?: Record<string, JsonValue>;
 }
 
 export interface AuthoredGap {
@@ -99,6 +99,7 @@ export interface PhonePlanPhone {
   vowelSign: number;
   metadata: PhoneEvent["metadata"];
   note: ScoreNote;
+  extensions?: Record<string, JsonValue>;
 }
 
 export interface ModuleProvenance {
@@ -131,6 +132,7 @@ export interface EngineRow {
   scoreStartTick: number;
   scoreEndTick: number;
   midi: number | null;
+  contexts?: ReturnType<typeof sinsyContextGroups>;
 }
 
 export interface EngineScore {
@@ -668,6 +670,7 @@ function rowFromEvent(
     scoreStartTick: event.note.startDiv,
     scoreEndTick: event.note.endDiv,
     midi: event.note.pitch?.midi ?? null,
+    contexts: sinsyContextGroups(events, index),
   };
 }
 
