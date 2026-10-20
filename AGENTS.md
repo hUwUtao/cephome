@@ -4,6 +4,8 @@ A Bun-based monorepo for Vietnamese→CeVIO text-to-speech phoneme transcription
 
 **Engine-specific details**: See `engine/AGENTS.md`
 
+**Glossary**: See [`GLOSSARY.md`](GLOSSARY.md) for bilingual glosses of terms used in code references.
+
 ## Tech Stack
 
 - **Runtime**: Bun (not Node.js)

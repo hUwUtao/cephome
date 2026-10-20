@@ -1,0 +1,14 @@
+{
+	"repo_notes": [
+		{
+			"content": "When documenting or explaining Vietnamese terminology from code references, use GLOSSARY.md as the source of truth. Give every gloss in exactly one of these bilingual forms: vi (en) or en (vi), preserving Vietnamese diacritics. Link claims to source files."
+		}
+	],
+	"pages": [
+		{
+			"title": "Vietnamese Phoneme Transcription",
+			"purpose": "Document the Vietnamese to CeVIO transcription pipeline, including normalization, syllable segmentation, onset, nucleus and coda mappings, tone handling, and the glossary terms in GLOSSARY.md.",
+			"parent": null
+		}
+	]
+}
