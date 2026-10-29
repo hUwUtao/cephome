@@ -23,7 +23,9 @@ export class VocalLineNormalizer implements ScoreNormalizer {
   }
 
   normalize(score: ScoreDocument): ScoreDocument {
-    const selected = this.selectVocalVoice(score.notes);
+    const selected = this.selectVocalVoice(
+      score.notes.map((note) => (note.lyric?.trim() === "-" ? { ...note, lyric: null } : note)),
+    );
     const printable = selected
       .filter((note) => note.isPrintable && !note.isCue) // Keep grace notes
       .sort((a, b) => a.startDiv - b.startDiv || a.id.localeCompare(b.id));
