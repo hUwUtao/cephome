@@ -423,7 +423,15 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
 
   for (let index = 0; index < input.length; ) {
     const note = input[index]!;
-    if (!note.slurs?.includes("start")) {
+    const explicitSlur = note.slurs?.includes("start") ?? false;
+    const next = input[index + 1];
+    const implicitSlur =
+      hasVoicedLyric(note) &&
+      !note.slurs?.includes("stop") &&
+      next !== undefined &&
+      next.startTick === note.endTick &&
+      isImplicitSlurContinuation(next);
+    if (!explicitSlur && !implicitSlur) {
       if (note.slurs?.includes("stop")) {
         diagnostics.push({
           severity: "warning",
@@ -439,12 +447,13 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
     }
 
     const chain = [note];
-    let closed = note.slurs.includes("stop");
+    let closed = note.slurs?.includes("stop") ?? false;
     let cursor = index + 1;
     while (!closed && cursor < input.length) {
       const previous = chain[chain.length - 1]!;
       const next = input[cursor]!;
       if (next.startTick !== previous.endTick) break;
+      if (!explicitSlur && !isImplicitSlurContinuation(next)) break;
       if (hasVoicedLyric(next)) {
         diagnostics.push({
           severity: "warning",
@@ -467,7 +476,7 @@ function collapseSlurChains(track: AuthoredTrack): CollapsedSlurNotes {
       cursor += 1;
       closed = next.slurs?.includes("stop") ?? false;
     }
-    if (!closed) {
+    if (explicitSlur && !closed) {
       diagnostics.push({
         severity: "warning",
         code: "unmatched_slur_start",
@@ -497,6 +506,15 @@ function normalizedAuthoredNote(note: AuthoredNote): AuthoredNote {
 function hasVoicedLyric(note: AuthoredNote): boolean {
   const lyric = canonicalizeSingingLyric(note.lyric ?? "");
   return lyric.length > 0 && lyric !== "-" && lyric !== "+";
+}
+
+function isImplicitSlurContinuation(note: AuthoredNote): boolean {
+  const lyric = canonicalizeSingingLyric(note.lyric ?? "");
+  return (
+    (lyric.length === 0 || lyric === "-") &&
+    !note.slurs?.includes("start") &&
+    !note.phoneOverride?.length
+  );
 }
 
 function noteToScoreNote(track: AuthoredTrack, note: AuthoredNote): ScoreNote {

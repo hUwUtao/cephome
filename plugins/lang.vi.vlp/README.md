@@ -4,6 +4,10 @@ Vietnamese Amadeus language plugin. It is a guest-only bundle: the host owns
 registration and dispatch, while this plugin supplies the public language and
 post-pitch hooks.
 
+Contiguous notes with empty lyrics or a standalone `-` continue the preceding
+syllable's phone expansion without explicit slur markers. A new lyric, gap, or
+phone override ends this implicit continuation.
+
 ```bash
 # from cephome root
 bun install
